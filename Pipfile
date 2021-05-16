@@ -1,0 +1,32 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+canvasapi = "*"
+black = "*"
+flake8 = "*"
+pre-commit = "*"
+pytest = "*"
+pytest-cov = "*"
+
+[packages]
+ipykernel = "*"
+pandas = "*"
+numpy = "*"
+scipy = "*"
+quandl = "*"
+tqdm = "*"
+plotly = "*"
+gitpython = "*"
+tabulate = "*"
+nbformat = "*"
+ipywidgets = "*"
+boto3 = "*"
+
+[requires]
+python_version = "3.8"
+
+[pipenv]
+allow_prereleases = true
