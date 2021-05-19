@@ -25,6 +25,8 @@ nbformat = "*"
 ipywidgets = "*"
 boto3 = "*"
 binance-futures =  {git = "https://github.com/CalebEverett/Binance_Futures_python.git"}
+psutil = "*"
+kaleido = "*"
 
 [requires]
 python_version = "3.8"
