@@ -1,3 +1,5 @@
+from datetime import datetime
+import hmac
 import gzip
 import os
 from typing import Dict, List
@@ -10,11 +12,13 @@ from canvasapi import Canvas
 import numpy as np
 import numpy as np
 import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
 from plotly import colors
 from plotly.subplots import make_subplots
 import quandl
 import requests
+from requests import Request
 from scipy import stats
 from tqdm.notebook import tqdm
 
@@ -182,151 +186,225 @@ def download_s3_file(filename: str):
 
 
 # =============================================================================
-# Strategy
+# Binance Futures API Calls
 # =============================================================================
 
 
-def get_accum_df(
-    df: pd.DataFrame,
-    arrival_time: str = "2018-04-08 22:05",
-    quantity=3.25e9,
-    side: int = 1,
-    participation=0.050,
-    max_trade_participation=0.10,
-    chunk_size=6.5e9,
-    price_window_ms=200,
-):
-    """Creates accumulation data frame that trades can be calculated from."""
+def sign_request(tbd):
 
-    # Create accumulation dataframe
-    df_accum = df.loc[arrival_time:].copy()
-    df_accum["CumSizeBillionths"] = df_accum.SizeBillionths.cumsum()
+    base_url = "https://fapi.binance.com"
+    end_point = "/fapi/v1/continuousKlines"
 
-    df_accum = df_accum[df_accum.Side == side].copy()
+    params = dict()
+    request = Request("GET", f"{base_url}{end_point}", params=params)
+    prepared = request.prepare()
 
-    price_agg = {1: "max", -1: "min"}[side]
-    df_accum = (
-        df_accum.reset_index()
-        .groupby("timestamp_utc_nanoseconds")
-        .agg(
-            {
-                "CumSizeBillionths": "max",
-                "SizeBillionths": "sum",
-                "PriceMillionths": price_agg,
-                "Side": "first",
-            }
-        )
-    )
-
-    df_accum["CumChunks"] = df_accum.CumSizeBillionths.floordiv(chunk_size)
-    df_accum["CumParticipation"] = (
-        (
-            (
-                df_accum.CumChunks.map(
-                    df_accum.groupby("CumChunks").min()["CumSizeBillionths"].iloc[1:]
-                )
-                * participation
-            )
-            .fillna(0)
-            .apply(lambda x: min(x, quantity))
-        )
-        .round()
-        .astype(int)
-    )
-
-    df_accum["TradePrice"] = (
-        df_accum.PriceMillionths.sort_index(ascending=False)
-        .rolling(f"{price_window_ms}ms")
-        .agg(price_agg)
-        .sort_index()
-    )
-
-    df_accum["QualifiedTrade"] = df_accum["TradePrice"] == df_accum["PriceMillionths"]
-
-    df_accum["MaxTradeSize"] = round(
-        df_accum.SizeBillionths * max_trade_participation, 0
-    )
-
-    # Calculate trades
-    df_trades = get_trades_df(df_accum)
-    assert (
-        df_trades.StratTradeSize.sum() == quantity
-    ), "Sum of trades does not equal quantity."
-
-    # Prepare result record
-    S0 = df_accum.iloc[0].PriceMillionths
-    VWAP = round(
-        df_trades.StratTradePrice.astype(object).dot(
-            df_trades.StratTradeSize.astype(object)
-        )
-        / quantity
-    )
-    IS = VWAP / S0 - 1 if side else 1 - VWAP / S0
-
-    completion_time = df_trades.index.max()
-
-    result = dict(
-        quantity=int(quantity),
-        side=side,
-        S0=S0,
-        VWAP=VWAP,
-        IS=IS,
-        n_trades=len(df_trades),
-        mean_trade_size=int(df_trades.StratTradeSize.mean()),
-        arrival_time=df_accum.index.min(),
-        completion_time=completion_time,
-        execution_time=completion_time - df_accum.index.min(),
-        participation=participation,
-        max_trade_participation=max_trade_participation,
-        chunk_size=int(chunk_size),
-        price_window_ms=price_window_ms,
-    )
-
-    return df_accum.loc[: df_trades.index.max()], df_trades, result
+    signature_payload = f"{prepared.path_url.split('?')[-1]}".encode()
+    params["signature"] = hmac.new(
+        os.getenv("BINANCE_API_SECRET").encode(), signature_payload, "sha256"
+    ).hexdigest()
 
 
-def get_trades_df(df_accum: pd.DataFrame) -> pd.DataFrame:
-    """Calculates trades from accumulation dataframe."""
-
-    trades = []
-    cum_trades = 0
-    tick_idx = 0
-    while cum_trades < df_accum.CumParticipation.max():
-        tick = df_accum.iloc[tick_idx]
-
-        if tick.CumParticipation - cum_trades > 0 and tick.QualifiedTrade:
-            trade_size = min(tick.CumParticipation - cum_trades, tick.MaxTradeSize)
-            trades.append((tick.name, trade_size, tick.TradePrice))
-            cum_trades += trade_size
-
-        tick_idx += 1
-
-    df_trades = (
-        pd.DataFrame(
-            trades,
-            columns=["timestamp_utc_nanoseconds", "StratTradeSize", "StratTradePrice"],
-        )
-        .set_index("timestamp_utc_nanoseconds")
-        .astype(int)
-    )
-
-    return df_trades
-
-
-def get_results_df(df: pd.DataFrame, params: Dict, nobs: int = 100) -> pd.DataFrame:
-    """Runs strategy for given number of observations and returns results
-    dataframe.
+def get_exchange_info():
+    """
+    Gets current exchange trading rules and symbol information.
     """
 
-    results = []
-    while len(results) < nobs:
-        params["arrival_time"] = np.random.choice(df.index.unique())
-        try:
-            results.append(get_accum_df(df, **params)[-1])
-        except:
-            pass
+    base_url = "https://api.binance.com"
+    end_point = "/api/v3/exchangeInfo"
 
-    return pd.DataFrame(results)
+    r = requests.get(
+        f"{base_url}{end_point}",
+        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+    )
+
+    df = pd.DataFrame(
+        r.json()["symbols"],
+    ).set_index("symbol")
+
+    return df
+
+
+def get_funding_rate_history(
+    symbol: str,
+    limit: int = None,
+    start_time: str = None,
+    end_time: str = None,
+):
+    """
+    Fetches funding rate history. Times are rounded to neaerest second to
+    facilitate comparison with prices on the same index.
+    """
+
+    base_url = "https://fapi.binance.com"
+    end_point = "/fapi/v1/fundingRate"
+
+    if start_time is not None:
+        start_time = int(datetime.fromisoformat(start_time).timestamp() * 1000)
+
+    if end_time is not None:
+        end_time = int(datetime.fromisoformat(end_time).timestamp() * 1000)
+
+    params = {
+        "limit": limit,
+        "symbol": symbol,
+        "startTime": start_time,
+        "endTime": end_time,
+    }
+
+    r = requests.get(
+        f"{base_url}{end_point}",
+        params=params,
+        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+    )
+    df = pd.DataFrame(
+        r.json(),
+    )
+
+    df.fundingTime = pd.to_datetime(df.fundingTime, unit="ms").round("1s")
+
+    return df.set_index("fundingTime")[["fundingRate"]]
+
+
+def get_candlestick_df(resp_json: List[Dict]) -> pd.DataFrame:
+    """
+    Returns dataframe from candlestick data json response:
+    """
+
+    df = pd.DataFrame(
+        resp_json,
+        columns=[
+            "openTime",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "closeTime",
+            "quoteAssetVolume",
+            "numTrades",
+            "takerBuyBaseAssetVolume",
+            "takerBuyQuoteAssetVolume",
+            "ignore",
+        ],
+    ).astype(
+        {
+            "openTime": int,
+            "open": float,
+            "high": float,
+            "low": float,
+            "close": float,
+            "volume": float,
+            "closeTime": int,
+            "quoteAssetVolume": float,
+            "numTrades": int,
+            "takerBuyBaseAssetVolume": float,
+            "takerBuyQuoteAssetVolume": float,
+            "ignore": object,
+        },
+    )
+
+    df.openTime = pd.to_datetime(df.openTime, unit="ms")
+    df.closeTime = pd.to_datetime(df.closeTime, unit="ms")
+
+    return df.set_index("openTime")
+
+
+def get_continuous_contracts(
+    pair: str,
+    interval: str = "8h",
+    contract_type: str = "PERPETUAL",
+    limit: int = None,
+    start_time: str = None,
+    end_time: str = None,
+):
+    """
+    Fetches continuous contract data.
+
+    Args:
+        interval: Must be one of the following, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h
+                    6h, 8h, 12h, 1d, 3d, 1w, 1M.
+        contact_type: Must be one of PERPETUAL, CURRENT_MONTH, NEXT_MONTH,
+            CURRENT_QUARTER, NEXT_QUARTER
+
+    """
+
+    base_url = "https://fapi.binance.com"
+    end_point = "/fapi/v1/continuousKlines"
+
+    if start_time is not None:
+        start_time = int(datetime.fromisoformat(start_time).timestamp() * 1000)
+
+    if end_time is not None:
+        end_time = int(datetime.fromisoformat(end_time).timestamp() * 1000)
+
+    params = {
+        "limit": limit,
+        "pair": pair,
+        "interval": interval,
+        "contractType": contract_type,
+        "startTime": start_time,
+        "endTime": end_time,
+    }
+
+    r = requests.get(
+        f"{base_url}{end_point}",
+        params=params,
+        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+    )
+
+    df_pv = get_candlestick_df(r.json())
+
+    return df_pv
+
+
+def get_klines(
+    symbol: str,
+    interval: str = "8h",
+    limit: int = None,
+    start_time: str = None,
+    end_time: str = None,
+    verbose: bool = False,
+):
+    """
+    Fetches kline/candlestick data for symbol.
+
+    Args:
+        interval: Must be one of the following, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h
+                    6h, 8h, 12h, 1d, 3d, 1w, 1M.
+        contact_type: Must be one of PERPETUAL, CURRENT_MONTH, NEXT_MONTH,
+            CURRENT_QUARTER, NEXT_QUARTER
+
+    """
+
+    base_url = "https://api.binance.com"
+    end_point = "/api/v3/klines"
+
+    if start_time is not None:
+        start_time = int(datetime.fromisoformat(start_time).timestamp() * 1000)
+
+    if end_time is not None:
+        end_time = int(datetime.fromisoformat(end_time).timestamp() * 1000)
+
+    params = {
+        "limit": limit,
+        "symbol": symbol,
+        "interval": interval,
+        "startTime": start_time,
+        "endTime": end_time,
+    }
+
+    r = requests.get(
+        f"{base_url}{end_point}",
+        params=params,
+        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+    )
+    if verbose:
+        print(r.text)
+
+    df_pv = get_candlestick_df(r.json())
+
+    return df_pv
 
 
 # =============================================================================
@@ -334,6 +412,39 @@ def get_results_df(df: pd.DataFrame, params: Dict, nobs: int = 100) -> pd.DataFr
 # =============================================================================
 
 COLORS = colors.qualitative.T10
+
+
+def make_price_volume_chart(df_pv: pd.DataFrame, title: str):
+    """
+    Returns figure for price volume chart.
+    """
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_width=[0.2, 0.7]
+    )
+    fig.add_trace(
+        go.Candlestick(
+            x=df_pv.index,
+            open=df_pv.open,
+            low=df_pv.low,
+            high=df_pv.high,
+            close=df_pv.close,
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Bar(x=df_pv.index, y=df_pv.volume, marker=dict(color=COLORS[0])),
+        row=2,
+        col=1,
+    )
+    fig.update(
+        layout_xaxis_rangeslider_visible=False,
+        layout_title=title,
+        layout_showlegend=False,
+    )
+
+    return fig
+
 
 IS_labels = [
     ("obs", lambda x: f"{x:>7d}"),
