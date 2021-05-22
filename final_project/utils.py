@@ -550,165 +550,15 @@ def get_moments_annotation(
     )
 
 
-def make_components_chart(
-    yc_L: str,
-    fx_B: str,
-    fx_L: str,
-    libor: str,
-    leverage: float,
-    date_range: pd.date_range,
-    dfs_yc: Dict,
-    dfs_fx: Dict,
-    dfs_libor: Dict,
-) -> go.Figure:
-
-    fig = make_subplots(
-        rows=2,
-        cols=2,
-        subplot_titles=[
-            f"5-Year Yield: {yc_L}",
-            f"FX Rate: {fx_L}:{fx_B}",
-            f"3 Month Libor: {libor}",
-            f"FX Rate: {fx_B}:USD",
-        ],
-        vertical_spacing=0.09,
-        horizontal_spacing=0.08,
-        specs=[
-            [{"secondary_y": True}, {"secondary_y": True}],
-            [{"secondary_y": False}, {"secondary_y": True}],
-        ],
-    )
-
-    # Lend market yield
-    # =================
-    fig.add_trace(
-        go.Scatter(
-            x=date_range,
-            y=dfs_yc[yc_L].loc[date_range]["5-year"],
-            line=dict(width=1, color=COLORS[0]),
-            name=yc_L,
-        ),
-        row=1,
-        col=1,
-        secondary_y=False,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=date_range,
-            y=dfs_yc[yc_L].loc[date_range]["5-year"].pct_change() * 100,
-            line=dict(width=1, color=COLORS[1], dash="dot"),
-            name=yc_L,
-        ),
-        row=1,
-        col=1,
-        secondary_y=True,
-    )
-
-    # Borrow market fx
-    # =================
-    fig.add_trace(
-        go.Scatter(
-            x=date_range,
-            y=dfs_fx[fx_B].loc[date_range].rate,
-            line=dict(width=1, color=COLORS[0]),
-            name=fx_B,
-        ),
-        row=2,
-        col=2,
-        secondary_y=False,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=date_range,
-            y=dfs_fx[fx_B].loc[date_range].rate.pct_change() * 100,
-            line=dict(width=1, color=COLORS[1], dash="dot"),
-            name=fx_B,
-        ),
-        row=2,
-        col=2,
-        secondary_y=True,
-    )
-
-    # Borrow market funding cost
-    # =================
-    fig.add_trace(
-        go.Scatter(
-            x=date_range,
-            y=dfs_libor[libor].loc[date_range].value,
-            line=dict(width=1, color=COLORS[0]),
-            name=libor,
-        ),
-        row=2,
-        col=1,
-    )
-
-    # Lend market fx cost
-    # =================
-    fx_BL = (
-        dfs_fx[fx_L].loc[date_range].loc[date_range].rate
-        / dfs_fx[fx_B].loc[date_range].rate
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=date_range,
-            y=fx_BL,
-            line=dict(width=1, color=COLORS[0]),
-            name=fx_L,
-        ),
-        row=1,
-        col=2,
-        secondary_y=False,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=date_range,
-            y=fx_BL.pct_change() * 100,
-            line=dict(width=1, color=COLORS[1], dash="dot"),
-            name=fx_L,
-        ),
-        row=1,
-        col=2,
-        secondary_y=True,
-    )
-
-    fig.update_xaxes(showline=True, linewidth=1, linecolor="grey", mirror=True)
-    fig.update_yaxes(
-        showline=True, linewidth=1, linecolor="grey", mirror=True, tickformat="0.1f"
-    )
-
-    fig.update_layout(
-        title_text=(
-            f"Weekly Carry Trade: Borrow {fx_B}, Lend {yc_L}"
-            "<br>Underlying Securities: "
-            f"{date_range.min().strftime('%Y-%m-%d')}"
-            f" - {date_range.max().strftime('%Y-%m-%d')}"
-        ),
-        showlegend=False,
-        height=600,
-        font=dict(size=10),
-        margin=dict(l=50, r=10, b=40, t=90),
-        yaxis3=dict(tickformat="0.3f"),
-    )
-
-    for i in fig["layout"]["annotations"]:
-        i["font"]["size"] = 12
-
-    return fig
-
-
 def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
 
     fig = make_subplots(
         rows=2,
         cols=2,
         subplot_titles=[
-            f"Returns",
-            f"Returns Distribution",
-            f"Cumulative Returns",
+            f"Log Returns",
+            f"Log Returns Distribution",
+            f"Cumulative Log Returns",
             f"Q/Q Plot",
         ],
         vertical_spacing=0.09,
@@ -799,7 +649,7 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
     )
 
     fig.add_annotation(
-        text=(f"{df_ret.per_return.cumsum()[-1] * 100:0.2f}"),
+        text=(f"{df_ret.per_return.cumsum()[-1] * 100:0.1f}%"),
         xref="paper",
         yref="y3",
         x=0.465,
@@ -814,8 +664,8 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
             df_ret.per_return.dropna(),
             xref="paper",
             yref="paper",
-            x=0.81,
-            y=0.23,
+            x=0.55,
+            y=0.45,
             xanchor="left",
             title="Returns",
             labels=IS_labels,
@@ -836,11 +686,11 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
         height=600,
         font=dict(size=10),
         margin=dict(l=50, r=50, b=50, t=100),
-        yaxis=dict(tickformat="0.1f"),
+        yaxis=dict(tickformat="0.2f"),
         yaxis3=dict(tickformat="0.1f"),
         yaxis2=dict(tickformat="0.1f"),
         yaxis4=dict(tickformat="0.1f"),
-        xaxis2=dict(tickformat="0.1f"),
+        xaxis2=dict(tickformat="0.3f"),
         xaxis4=dict(tickformat="0.1f"),
     )
 
