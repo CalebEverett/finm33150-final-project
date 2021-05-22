@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 import hmac
 import gzip
 import os
@@ -225,47 +225,6 @@ def get_exchange_info():
     return df
 
 
-def get_funding_rate_history(
-    symbol: str,
-    limit: int = None,
-    start_time: str = None,
-    end_time: str = None,
-):
-    """
-    Fetches funding rate history. Times are rounded to neaerest second to
-    facilitate comparison with prices on the same index.
-    """
-
-    base_url = "https://fapi.binance.com"
-    end_point = "/fapi/v1/fundingRate"
-
-    if start_time is not None:
-        start_time = int(datetime.fromisoformat(start_time).timestamp() * 1000)
-
-    if end_time is not None:
-        end_time = int(datetime.fromisoformat(end_time).timestamp() * 1000)
-
-    params = {
-        "limit": limit,
-        "symbol": symbol,
-        "startTime": start_time,
-        "endTime": end_time,
-    }
-
-    r = requests.get(
-        f"{base_url}{end_point}",
-        params=params,
-        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
-    )
-    df = pd.DataFrame(
-        r.json(),
-    )
-
-    df.fundingTime = pd.to_datetime(df.fundingTime, unit="ms").round("1s")
-
-    return df.set_index("fundingTime")[["fundingRate"]]
-
-
 def get_candlestick_df(resp_json: List[Dict]) -> pd.DataFrame:
     """
     Returns dataframe from candlestick data json response:
@@ -307,7 +266,66 @@ def get_candlestick_df(resp_json: List[Dict]) -> pd.DataFrame:
     df.openTime = pd.to_datetime(df.openTime, unit="ms")
     df.closeTime = pd.to_datetime(df.closeTime, unit="ms")
 
+    df["per_return"] = np.log(df.close / df.close.shift())
+
     return df.set_index("openTime")
+
+
+def get_utc_timestamp(iso_format_datetime: str):
+    return int(
+        datetime.fromisoformat(iso_format_datetime)
+        .replace(tzinfo=timezone.utc)
+        .timestamp()
+        * 1000
+    )
+
+
+def get_utc_timestamp_now():
+    return int(
+        datetime.now(timezone.utc).replace(tzinfo=timezone.utc).timestamp() * 1000
+    )
+
+
+def get_times(start_time: str, end_time: str):
+    """
+    Return utc timestamps from isoformat datetime strings.
+    """
+
+    if start_time is not None:
+        start_time = get_utc_timestamp(start_time)
+
+    if end_time is None:
+        end_time = get_utc_timestamp_now()
+    else:
+        end_time = min(get_utc_timestamp_now(), get_utc_timestamp(end_time))
+
+    return start_time, end_time
+
+
+def fetch_request(base_url: str, end_point: str, params: Dict) -> pd.DataFrame:
+    """
+    Returns list of records iterating through multiple requests to
+    fetch continuous history from params.startTime to params.endTime.
+    """
+
+    r = requests.get(
+        f"{base_url}{end_point}",
+        params=params,
+        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+    )
+
+    records = r.json()
+
+    while r.json()[-1][6] < params["endTime"]:
+        params["startTime"] = r.json()[-1][6] + 1
+        r = requests.get(
+            f"{base_url}{end_point}",
+            params=params,
+            headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+        )
+        records.extend(r.json())
+
+    return records
 
 
 def get_continuous_contracts(
@@ -332,11 +350,7 @@ def get_continuous_contracts(
     base_url = "https://fapi.binance.com"
     end_point = "/fapi/v1/continuousKlines"
 
-    if start_time is not None:
-        start_time = int(datetime.fromisoformat(start_time).timestamp() * 1000)
-
-    if end_time is not None:
-        end_time = int(datetime.fromisoformat(end_time).timestamp() * 1000)
+    start_time, end_time = get_times(start_time, end_time)
 
     params = {
         "limit": limit,
@@ -347,15 +361,9 @@ def get_continuous_contracts(
         "endTime": end_time,
     }
 
-    r = requests.get(
-        f"{base_url}{end_point}",
-        params=params,
-        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
-    )
+    records = fetch_request(base_url, end_point, params)
 
-    df_pv = get_candlestick_df(r.json())
-
-    return df_pv
+    return get_candlestick_df(records)
 
 
 def get_klines(
@@ -380,11 +388,7 @@ def get_klines(
     base_url = "https://api.binance.com"
     end_point = "/api/v3/klines"
 
-    if start_time is not None:
-        start_time = int(datetime.fromisoformat(start_time).timestamp() * 1000)
-
-    if end_time is not None:
-        end_time = int(datetime.fromisoformat(end_time).timestamp() * 1000)
+    start_time, end_time = get_times(start_time, end_time)
 
     params = {
         "limit": limit,
@@ -394,17 +398,59 @@ def get_klines(
         "endTime": end_time,
     }
 
+    records = fetch_request(base_url, end_point, params)
+
+    return get_candlestick_df(records)
+
+
+def get_funding_rate_history(
+    symbol: str,
+    limit: int = None,
+    start_time: str = None,
+    end_time: str = None,
+):
+    """
+    Fetches funding rate history. Times are rounded to neaerest second to
+    facilitate comparison with prices on the same index.
+    """
+
+    base_url = "https://fapi.binance.com"
+    end_point = "/fapi/v1/fundingRate"
+
+    start_time, end_time = get_times(start_time, end_time)
+
+    params = {
+        "limit": limit,
+        "symbol": symbol,
+        "startTime": start_time,
+        "endTime": end_time,
+    }
+
     r = requests.get(
         f"{base_url}{end_point}",
         params=params,
         headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
     )
-    if verbose:
-        print(r.text)
 
-    df_pv = get_candlestick_df(r.json())
+    records = r.json()
 
-    return df_pv
+    while r.json()[-1]["fundingTime"] < (params["endTime"] - 8 * 60 * 60 * 1000):
+
+        params["startTime"] = r.json()[-1]["fundingTime"] + 1
+        r = requests.get(
+            f"{base_url}{end_point}",
+            params=params,
+            headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+        )
+        records.extend(r.json())
+
+    df = pd.DataFrame(records)
+
+    df.fundingRate = df.fundingRate.astype(float)
+
+    df.fundingTime = pd.to_datetime(df.fundingTime, unit="ms").round("1s")
+
+    return df.set_index("fundingTime")[["fundingRate"]]
 
 
 # =============================================================================
@@ -428,6 +474,7 @@ def make_price_volume_chart(df_pv: pd.DataFrame, title: str):
             low=df_pv.low,
             high=df_pv.high,
             close=df_pv.close,
+            line=dict(width=1),
         ),
         row=1,
         col=1,
@@ -437,9 +484,16 @@ def make_price_volume_chart(df_pv: pd.DataFrame, title: str):
         row=2,
         col=1,
     )
+
+    title_text = (
+        f"{title}<br>"
+        f"{df_pv.index.min().strftime('%Y-%m-%d %H:%M')}"
+        f" - {df_pv.closeTime.max().strftime('%Y-%m-%d %H:%M')}"
+    )
+
     fig.update(
         layout_xaxis_rangeslider_visible=False,
-        layout_title=title,
+        layout_title=title_text,
         layout_showlegend=False,
     )
 
@@ -646,15 +700,13 @@ def make_components_chart(
     return fig
 
 
-def make_returns_chart(df_ret: pd.DataFrame) -> go.Figure:
-
-    fx_B, yc_L = df_ret.name.split(",")
+def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
 
     fig = make_subplots(
         rows=2,
         cols=2,
         subplot_titles=[
-            f"Weekly Returns",
+            f"Returns",
             f"Returns Distribution",
             f"Cumulative Returns",
             f"Q/Q Plot",
@@ -664,7 +716,7 @@ def make_returns_chart(df_ret: pd.DataFrame) -> go.Figure:
     )
 
     # Returns Distribution
-    returns = pd.cut(df_ret.per_return, 50).value_counts().sort_index()
+    returns = pd.cut(df_ret.per_return, 100).value_counts().sort_index()
     midpoints = returns.index.map(lambda interval: interval.right).to_numpy()
     norm_dist = stats.norm.pdf(
         midpoints, loc=df_ret.per_return.mean(), scale=df_ret.per_return.std()
@@ -759,7 +811,7 @@ def make_returns_chart(df_ret: pd.DataFrame) -> go.Figure:
 
     fig.add_annotation(
         get_moments_annotation(
-            df_ret.per_return,
+            df_ret.per_return.dropna(),
             xref="paper",
             yref="paper",
             x=0.81,
@@ -776,10 +828,9 @@ def make_returns_chart(df_ret: pd.DataFrame) -> go.Figure:
 
     fig.update_layout(
         title_text=(
-            f"Weekly Carry Trade: Borrow {fx_B}, Lend {yc_L}"
-            "<br>Returns: "
-            f"{df_ret.index.min().strftime('%Y-%m-%d')}"
-            f" - {df_ret.index.max().strftime('%Y-%m-%d')}"
+            f"{title} Returns:<br>"
+            f"{df_ret.index.min().strftime('%Y-%m-%d %H:%M')}"
+            f" - {df_ret.closeTime.max().strftime('%Y-%m-%d %H:%M')}"
         ),
         showlegend=False,
         height=600,

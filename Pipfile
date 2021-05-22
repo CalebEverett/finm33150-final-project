@@ -27,6 +27,7 @@ boto3 = "*"
 binance-futures =  {git = "https://github.com/CalebEverett/Binance_Futures_python.git"}
 psutil = "*"
 kaleido = "*"
+jupyter-contrib-nbextensions = "*"
 
 [requires]
 python_version = "3.8"
