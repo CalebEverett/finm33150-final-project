@@ -22,6 +22,7 @@ import quandl
 import requests
 from requests import Request
 from scipy import stats
+from tabulate import tabulate
 from tqdm.notebook import tqdm
 
 # =============================================================================
@@ -848,19 +849,7 @@ class Strategy:
         data_feed: str = "EOD",
         date_fmt: str = "%Y-%m-%d",
     ) -> go.Figure:
-        """Returns figure for side-by-side q-q plots of daily returns.
-
-        Args:
-            title: Figure title.
-            data_feed: Quandl data feed code.
-            date_slices: Date ranges for charts, provided in the form of a tuple of slices
-                that can be used to index a Pandas DatetimeIndex. Date range will be
-                removed from the figure title and subplot date ranges added to subplot
-                titles.
-            price_col: Label of column in df by which the prices of the underlying
-                securities are accessible.
-            return_type: Either `log`, `simple` or `diff` to specify how returns
-                are calculated.
+        """
 
         Returns:
             A plotly Figure ready for plotting
@@ -873,7 +862,7 @@ class Strategy:
         date_range = pd.date_range(start_date, end_date, freq="D")
         range_breaks = date_range[~date_range.isin(dates)]
 
-        label_fn = FEED_PARAMS[data_feed]["label_fn"]
+        label_fn = lambda p: f"{p[1]}-{p[0]}"
 
         fig = go.Figure()
 
@@ -1056,6 +1045,8 @@ class Strategy:
             x=1,
             y=0.4,
             xanchor="left",
+            labels=IS_labels,
+            title="",
         )
         fig.add_annotation(returns_annotation)
 
@@ -1066,18 +1057,20 @@ class Strategy:
             x=1,
             y=0.8,
             xanchor="left",
+            labels=IS_labels,
+            title="",
         )
         fig.add_annotation(spread_annotation)
 
         return fig
 
 
-def get_ticks(pair: Tuple, df: pd.DataFrame, window: int):
+def get_ticks(pair: Tuple, df: pd.DataFrame, window: int, dollar_position_size: float):
     """Creates table of spread, returns, closing prices and trade amounts to be processed
     iteratively by a Strategy instance.
     """
 
-    columns = ["adj_close", "adj_return", "med_dollar_volume", "volume"]
+    columns = ["adj_close", "adj_return"]
     df_ticks = df.copy().iloc[
         :,
         (
@@ -1086,13 +1079,10 @@ def get_ticks(pair: Tuple, df: pd.DataFrame, window: int):
         ),
     ]
 
-    less_liquid = df_ticks["med_dollar_volume"].sum(axis=0).sort_values().index[0]
-    dollar_position_size = df_ticks[("med_dollar_volume", less_liquid)] / 100
-
     for S in pair:
         df_ticks[("position_size", S)] = (
             dollar_position_size / df_ticks[("adj_close", S)]
-        ).round()
+        )
 
     for S in pair:
         df_ticks[("rolling_adj_return", S)] = (
@@ -1142,7 +1132,7 @@ def make_price_volume_chart(df_pv: pd.DataFrame, title: str):
     title_text = (
         f"{title}<br>"
         f"{df_pv.index.min().strftime('%Y-%m-%d %H:%M')}"
-        f" - {df_pv.closeTime.max().strftime('%Y-%m-%d %H:%M')}"
+        f" - {df_pv.index.max().strftime('%Y-%m-%d %H:%M')}"
     )
 
     fig.update(
