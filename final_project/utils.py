@@ -550,15 +550,17 @@ def get_moments_annotation(
     )
 
 
-def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
+def make_overview_chart(
+    series: pd.DataFrame, title: str, subtitle_base: str = "Log Returns"
+) -> go.Figure:
 
     fig = make_subplots(
         rows=2,
         cols=2,
         subplot_titles=[
-            f"Log Returns",
-            f"Log Returns Distribution",
-            f"Cumulative Log Returns",
+            subtitle_base,
+            f"{subtitle_base} Distribution",
+            f"Cumulative {subtitle_base}",
             f"Q/Q Plot",
         ],
         vertical_spacing=0.09,
@@ -566,16 +568,14 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
     )
 
     # Returns Distribution
-    returns = pd.cut(df_ret.per_return, 100).value_counts().sort_index()
-    midpoints = returns.index.map(lambda interval: interval.right).to_numpy()
-    norm_dist = stats.norm.pdf(
-        midpoints, loc=df_ret.per_return.mean(), scale=df_ret.per_return.std()
-    )
+    series_cuts = pd.cut(series, 100).value_counts().sort_index()
+    midpoints = series_cuts.index.map(lambda interval: interval.right).to_numpy()
+    norm_dist = stats.norm.pdf(midpoints, loc=series.mean(), scale=series.std())
 
     fig.add_trace(
         go.Scatter(
-            x=df_ret.index,
-            y=df_ret.per_return * 100,
+            x=series.index,
+            y=series,
             line=dict(width=1, color=COLORS[0]),
             name="return",
         ),
@@ -585,8 +585,8 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
 
     fig.add_trace(
         go.Scatter(
-            x=df_ret.index,
-            y=df_ret.per_return.cumsum() * 100,
+            x=series.index,
+            y=series.cumsum(),
             line=dict(width=1, color=COLORS[0]),
             name="cum. return",
         ),
@@ -596,8 +596,8 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
 
     fig.add_trace(
         go.Bar(
-            x=[interval.mid for interval in returns.index],
-            y=returns / returns.sum() * 100,
+            x=[interval.mid for interval in series_cuts.index],
+            y=series_cuts / series_cuts.sum(),
             name="pct. of returns",
             marker=dict(color=COLORS[0]),
         ),
@@ -607,8 +607,8 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
 
     fig.add_trace(
         go.Scatter(
-            x=[interval.mid for interval in returns.index],
-            y=norm_dist / norm_dist.sum() * 100,
+            x=[interval.mid for interval in series_cuts.index],
+            y=norm_dist / norm_dist.sum(),
             name="normal",
             line=dict(width=1, color=COLORS[1]),
         ),
@@ -617,11 +617,9 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
     )
 
     # Q/Q Data
-    returns_norm = (
-        (df_ret.per_return - df_ret.per_return.mean()) / df_ret.per_return.std()
-    ).sort_values()
+    returns_norm = ((series - series.mean()) / series.std()).sort_values()
     norm_dist = pd.Series(
-        list(map(stats.norm.ppf, np.linspace(0.001, 0.999, len(df_ret.per_return)))),
+        list(map(stats.norm.ppf, np.linspace(0.001, 0.999, len(series)))),
         name="normal",
     )
 
@@ -649,11 +647,11 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
     )
 
     fig.add_annotation(
-        text=(f"{df_ret.per_return.cumsum()[-1] * 100:0.1f}%"),
+        text=(f"{series.cumsum()[-1] * 100:0.1f}%"),
         xref="paper",
         yref="y3",
         x=0.465,
-        y=df_ret.per_return.cumsum()[-1] * 100,
+        y=series.cumsum()[-1],
         xanchor="left",
         showarrow=False,
         align="left",
@@ -661,7 +659,7 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
 
     fig.add_annotation(
         get_moments_annotation(
-            df_ret.per_return.dropna(),
+            series.dropna(),
             xref="paper",
             yref="paper",
             x=0.55,
@@ -678,17 +676,17 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
 
     fig.update_layout(
         title_text=(
-            f"{title} Returns:<br>"
-            f"{df_ret.index.min().strftime('%Y-%m-%d %H:%M')}"
-            f" - {df_ret.closeTime.max().strftime('%Y-%m-%d %H:%M')}"
+            f"{title}<br>"
+            f"{series.index.min().strftime('%Y-%m-%d %H:%M')}"
+            f" - {series.index.max().strftime('%Y-%m-%d %H:%M')}"
         ),
         showlegend=False,
         height=600,
         font=dict(size=10),
         margin=dict(l=50, r=50, b=50, t=100),
-        yaxis=dict(tickformat="0.2f"),
-        yaxis3=dict(tickformat="0.1f"),
-        yaxis2=dict(tickformat="0.1f"),
+        yaxis=dict(tickformat="0.3f"),
+        yaxis3=dict(tickformat="0.3f"),
+        yaxis2=dict(tickformat="0.3f"),
         yaxis4=dict(tickformat="0.1f"),
         xaxis2=dict(tickformat="0.3f"),
         xaxis4=dict(tickformat="0.1f"),
@@ -699,4 +697,28 @@ def make_returns_chart(df_ret: pd.DataFrame, title: str) -> go.Figure:
 
     fig.update_annotations(font=dict(size=10))
 
+    return fig
+
+
+def make_2_yaxis_lines(
+    series1: pd.Series, series2: pd.Series, title: str, secondary_y: bool = False
+) -> go.Figure:
+    fig = make_subplots(specs=[[{"secondary_y": secondary_y}]])
+
+    fig.add_trace(
+        go.Scatter(x=series1.index, y=series1, name=series1.name, line=dict(width=1)),
+        secondary_y=False,
+    )
+    fig.add_trace(
+        go.Scatter(x=series2.index, y=series2, name=series2.name, line=dict(width=1)),
+        secondary_y=False,
+    )
+
+    title_text = (
+        f"{title}<br>"
+        f"{series1.index.min().strftime('%Y-%m-%d %H:%M')}"
+        f" - {series1.index.max().strftime('%Y-%m-%d %H:%M')}"
+    )
+
+    fig.update_layout(title=title_text)
     return fig
