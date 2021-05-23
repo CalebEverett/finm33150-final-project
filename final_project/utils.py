@@ -1,8 +1,10 @@
-from datetime import datetime, timezone, tzinfo
+from enum import Enum
+from dataclasses import dataclass
+from datetime import datetime, timezone
 import hmac
 import gzip
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from urllib.request import urlretrieve
 
 import boto3
@@ -451,6 +453,658 @@ def get_funding_rate_history(
     df.fundingTime = pd.to_datetime(df.fundingTime, unit="ms").round("1s")
 
     return df.set_index("fundingTime")[["fundingRate"]]
+
+
+# =============================================================================
+# Strategy
+# =============================================================================
+
+
+class PositionType(Enum):
+    LONG: str = "long"
+    SHORT: str = "short"
+
+
+@dataclass
+class Position:
+    position_type: PositionType
+    open_date: str
+    security: str
+    shares: int
+    open_price: float
+    open_transact_cost: float = 0
+    close_price: float = None
+    close_transact_cost: float = 0
+    closed: bool = False
+    close_date: str = None
+    transact_cost_per_share: float = 0.01
+
+    def __post_init__(self):
+        self.open_transact_cost = self.shares * self.transact_cost_per_share
+
+    @property
+    def open_value(self):
+        return self.shares * self.open_price
+
+    @property
+    def close_value(self):
+        return self.shares * self.close_price
+
+    @property
+    def transact_cost(self):
+        return self.open_transact_cost + self.close_transact_cost
+
+    @property
+    def gross_profit(self):
+        if self.closed:
+            if self.position_type == PositionType.LONG:
+                profit = self.close_value - self.open_value
+            else:
+                profit = self.open_value - self.close_value
+            return profit
+        else:
+            raise Exception("Position is still open.")
+
+    @property
+    def net_profit(self):
+        if self.closed:
+            return self.gross_profit - self.transact_cost
+        else:
+            raise Exception("Position is still open.")
+
+    def unrealized_profit(self, current_price: float):
+        if self.closed:
+            raise Exception("Position is closed.")
+        else:
+            if self.position_type == PositionType.LONG:
+                mv = self.shares * (current_price - self.open_price)
+            else:
+                mv = self.shares * (self.open_price - current_price)
+            return mv - self.shares * self.transact_cost_per_share
+
+    def close(self, close_date: str, close_price: float):
+        self.close_date = close_date
+        self.close_price = close_price
+        self.close_transact_cost = self.shares * self.transact_cost_per_share
+        self.closed = True
+
+
+class Strategy:
+    """Class for conducting a backtest of a spread trading strategy.
+
+    Properties:
+        pair: Tuple of securities
+        ticks: Pandas DataFrame with `adj_close`, `position_size`, and `adj_returns`
+            columns.
+        open_threshold: Absolute value of difference in returns above which
+            a position will be opened if one is not already open.
+        close_threshold: Absolute value of difference in returns above which
+            a position will be opened if one is not already open.
+        window: Trailing number of days over which the returns for
+            purposes of determining the spread between the two securities were
+            calculated.
+        cash: Balance of cash on hand
+        gross_profit: Realized gross profit as of `current_date`
+        transact_cost: Cash transaction costs incurred as of `current_date`
+        start_date: Starting date of the strategy
+        current_date: Current date of strategy
+        end_date: str = Ending date of strategy
+
+        long_position = Open long position as of `current_date` if any
+        short_position = Open short position as of `current_date` if any
+        closed_positions = Closed positions as of `current date`
+    """
+
+    def __init__(
+        self,
+        pair: Tuple,
+        df_ticks: pd.DataFrame,
+        open_threshold: float,
+        close_threshold: float,
+        window: int,
+        closed_positions: list,
+        run: bool = True,
+        transact_cost_per_share: float = 0.01,
+    ):
+
+        self.pair = pair
+        self.df_ticks = df_ticks
+        self.open_threshold = open_threshold
+        self.close_threshold = close_threshold
+        self.window = window
+        self.gross_profit: float = 0
+        self.transact_cost: float = 0
+        self.current_date: str = None
+        self.long_position: Position = None
+        self.short_position: Position = None
+        self.closed_positions = closed_positions
+        self.transact_cost_per_share = transact_cost_per_share
+
+        self.start_date = self.df_ticks.index.min().strftime("%Y-%m-%d")
+        self.end_date = self.df_ticks.index.max().strftime("%Y-%m-%d")
+
+        self.capital = (
+            self.df_ticks["position_size"] * self.df_ticks["adj_close"]
+        ).max().max() * 2
+
+        # Frequency of `BM` is last business day of month to make sure
+        # positions are closed if the calendar last day of the month
+        # is not a trading day.
+        self.month_ends = (
+            pd.date_range(self.start_date, self.end_date, freq="BM")
+            .strftime("%Y-%m-%d")
+            .to_list()
+        )
+
+        if run:
+            self.run()
+
+    @property
+    def net_profit(self):
+        return self.gross_profit - self.transact_cost
+
+    @property
+    def unrealized_profit(self):
+        if self.long_position:
+            return self.long_position.unrealized_profit(
+                self.current_prices[self.long_position.security]
+            ) + self.short_position.unrealized_profit(
+                self.current_prices[self.short_position.security]
+            )
+        else:
+            return 0
+
+    def open_long_position(
+        self, open_date: str, security: str, shares: int, open_price
+    ):
+        if self.long_position is not None:
+            raise Exception("An open long position already exists.")
+
+        if security not in self.pair:
+            raise Exception(
+                f"{security} is not included in strategy securities:"
+                f" {str(self.pair)}"
+            )
+
+        if open_date < self.current_date:
+            raise Exception(
+                f"Position open date of {open_date} is before strategy current"
+                f"date of {self.current_date}"
+            )
+
+        self.long_position = Position(
+            position_type=PositionType.LONG,
+            open_date=open_date,
+            security=security,
+            shares=shares,
+            open_price=open_price,
+            transact_cost_per_share=self.transact_cost_per_share,
+        )
+
+        self.transact_cost += self.long_position.open_transact_cost
+
+    def open_short_position(
+        self, open_date: str, security: str, shares: int, open_price
+    ):
+        if self.short_position is not None:
+            raise Exception("An open short position already exists.")
+
+        self.short_position = Position(
+            position_type=PositionType.SHORT,
+            open_date=open_date,
+            security=security,
+            shares=shares,
+            open_price=open_price,
+            transact_cost_per_share=self.transact_cost_per_share,
+        )
+
+        self.transact_cost += self.short_position.open_transact_cost
+
+    def close_long_position(self, close_date: str, close_price: float):
+        if self.long_position is None:
+            raise Exception("There is no open long position.")
+
+        self.long_position.close(close_date, close_price)
+
+        self.gross_profit += self.long_position.gross_profit
+        self.transact_cost += self.long_position.close_transact_cost
+
+        self.closed_positions.append(self.long_position)
+        self.long_position = None
+
+    def close_short_position(self, close_date: str, close_price: float):
+        if self.short_position is None:
+            raise Exception("There is no open long short.")
+
+        self.short_position.close(close_date, close_price)
+
+        self.gross_profit += self.short_position.gross_profit
+        self.transact_cost += self.short_position.close_transact_cost
+
+        self.closed_positions.append(self.short_position)
+        self.short_position = None
+
+    def record_trade(
+        self,
+        open_position: bool,
+        date: str,
+        spread: int,
+        long_security: str,
+        short_security: str,
+    ):
+        if open_position:
+            if short_security == self.pair[1]:
+                trade_type = "short"
+            else:
+                trade_type = "buy"
+        else:
+            if short_security == self.pair[1]:
+                trade_type = "buy"
+            else:
+                trade_type = "short"
+
+        self.trades.append(
+            {
+                "date": date,
+                "trade_type": trade_type,
+                "spread": spread,
+                "long_security": long_security,
+                "short_security": short_security,
+                "open_position": open_position,
+            }
+        )
+
+    def run(self):
+        self.stats = []
+        for tick in self.df_ticks.iterrows():
+            date, tick = tick
+            spread = tick.spread[0]
+            self.current_date = date.strftime("%Y-%m-%d")
+            self.current_prices = tick.adj_close
+            returns = tick.rolling_adj_return.sort_values()
+            short_security = returns.index[-1]
+            long_security = returns.index[0]
+
+            # Just testing long position since both long and short positions
+            # are always open or None. Don't open a position on the last day
+            # of the strategy.
+
+            # Closing positions first so that opening logic works whether opening
+            # from not having an open position or from after having sold because the
+            # spread reversed.
+
+            if self.long_position is not None and (
+                (
+                    abs(spread) < self.close_threshold
+                    or self.current_date in self.month_ends
+                    or self.current_date == self.end_date
+                )
+                or self.long_position.security != long_security
+            ):
+
+                self.close_long_position(
+                    close_date=self.current_date,
+                    close_price=tick.adj_close[self.long_position.security],
+                )
+
+                self.close_short_position(
+                    close_date=self.current_date,
+                    close_price=tick.adj_close[self.short_position.security],
+                )
+
+            if (
+                abs(spread) > self.open_threshold
+                and self.long_position is None
+                and self.current_date != self.end_date
+                and self.current_date not in self.month_ends
+            ):
+
+                self.open_long_position(
+                    open_date=self.current_date,
+                    security=long_security,
+                    shares=tick.position_size[long_security],
+                    open_price=tick.adj_close[long_security],
+                )
+
+                self.open_short_position(
+                    open_date=self.current_date,
+                    security=short_security,
+                    shares=tick.position_size[short_security],
+                    open_price=tick.adj_close[short_security],
+                )
+
+            if self.current_date == self.start_date:
+                prior_total_profit = 0
+            else:
+                prior_total_profit = self.stats[-1]["total_profit"]
+
+            total_profit = self.net_profit + self.unrealized_profit
+            tick_profit = total_profit - prior_total_profit
+            total_return = np.log(total_profit + self.capital) - np.log(self.capital)
+            tick_return = np.log(tick_profit + self.capital) - np.log(self.capital)
+            self.stats.append(
+                {
+                    "date": date,
+                    "realized_profit": self.net_profit,
+                    "unrealized_profit": self.unrealized_profit,
+                    "total_profit": total_profit,
+                    "tick_profit": tick_profit,
+                    "total_return": total_return,
+                    "tick_return": tick_return,
+                }
+            )
+
+    def get_day_trades(self, date: str):
+        trades = []
+        headers = ["trans", "sec", "shrs", "price", "profit"]
+        opened_positions = [p for p in self.closed_positions if p.open_date == date]
+        closed_positions = [p for p in self.closed_positions if p.close_date == date]
+
+        for p in opened_positions:
+            trans = "buy" if p.position_type.value == "long" else "short"
+            trades.append([trans, p.security, p.shares, p.open_price, -p.transact_cost])
+
+        for p in closed_positions:
+            trans = "sell" if p.position_type.value == "long" else "cover"
+            trades.append([trans, p.security, p.shares, p.close_price, p.net_profit])
+
+        hover_text = tabulate(
+            trades,
+            tablefmt="plain",
+            headers=headers,
+            floatfmt=("", "", ",.0f", ",.2f", ",.0f"),
+        ).replace("\n", "<br>")
+
+        if opened_positions:
+            long_position = [
+                p for p in opened_positions if p.position_type.value == "long"
+            ][0]
+            if long_position.security == self.pair[0]:
+                trade_type = "short"
+            else:
+                trade_type = "buy"
+        elif closed_positions:
+            long_position = [
+                p for p in closed_positions if p.position_type.value == "long"
+            ][0]
+            if long_position.security == self.pair[0]:
+                trade_type = "buy"
+            else:
+                trade_type = "short"
+
+        size = 6.5 if opened_positions and closed_positions else 4.5
+
+        return (
+            date,
+            self.df_ticks.loc[date].spread.values[0],
+            trade_type,
+            size,
+            hover_text,
+        )
+
+    def plot(
+        self,
+        title_text: str = "Spread Trading Chart",
+        data_feed: str = "EOD",
+        date_fmt: str = "%Y-%m-%d",
+    ) -> go.Figure:
+        """Returns figure for side-by-side q-q plots of daily returns.
+
+        Args:
+            title: Figure title.
+            data_feed: Quandl data feed code.
+            date_slices: Date ranges for charts, provided in the form of a tuple of slices
+                that can be used to index a Pandas DatetimeIndex. Date range will be
+                removed from the figure title and subplot date ranges added to subplot
+                titles.
+            price_col: Label of column in df by which the prices of the underlying
+                securities are accessible.
+            return_type: Either `log`, `simple` or `diff` to specify how returns
+                are calculated.
+
+        Returns:
+            A plotly Figure ready for plotting
+
+        """
+
+        dates = self.df_ticks.index.get_level_values("date")
+        start_date = dates.min()
+        end_date = dates.max()
+        date_range = pd.date_range(start_date, end_date, freq="D")
+        range_breaks = date_range[~date_range.isin(dates)]
+
+        label_fn = FEED_PARAMS[data_feed]["label_fn"]
+
+        fig = go.Figure()
+
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            subplot_titles=[
+                "Trades",
+                f"Returns: Total = {self.stats[-1]['total_return']:0.4f}, ${self.stats[-1]['total_profit']:0.0f}",
+            ],
+            shared_xaxes=True,
+            vertical_spacing=0.10,
+            specs=[[dict(secondary_y=True)], [dict(secondary_y=True)]],
+        )
+
+        # =======================
+        # Spread
+        # =======================
+
+        fig.append_trace(
+            go.Scatter(
+                y=self.df_ticks["spread"],
+                x=dates,
+                name="spread",
+                line=dict(width=1),
+            ),
+            row=1,
+            col=1,
+        )
+
+        def add_band(positive: int = 1):
+            fig.append_trace(
+                go.Scatter(
+                    y=[self.close_threshold * positive] * len(dates),
+                    x=dates,
+                    name="close_threshold",
+                    line=dict(width=0),
+                    hoverinfo="skip",
+                    showlegend=False,
+                ),
+                row=1,
+                col=1,
+            )
+
+            fig.append_trace(
+                go.Scatter(
+                    y=[self.open_threshold * positive] * len(dates),
+                    x=dates,
+                    name="open_threshold",
+                    fill="tonexty",
+                    line=dict(width=0),
+                    line_color=COLORS[4],
+                    hoverinfo="skip",
+                    showlegend=False,
+                ),
+                row=1,
+                col=1,
+            )
+
+        add_band()
+        add_band(-1)
+
+        # =======================
+        # Trades
+        # =======================
+
+        trade_dates = sorted(
+            sum([[p.open_date, p.close_date] for p in self.closed_positions], [])
+        )
+
+        df_trades = pd.DataFrame(
+            map(self.get_day_trades, trade_dates),
+            columns=["date", "spread", "trans", "marker_size", "text"],
+        )
+
+        fig.append_trace(
+            go.Scatter(
+                y=df_trades.spread,
+                x=df_trades.date,
+                name="trades",
+                mode="markers",
+                marker=dict(
+                    color=df_trades.trans.map({"buy": "green", "short": "red"}),
+                    size=df_trades.marker_size,
+                    line=dict(width=0),
+                ),
+                text=df_trades.text,
+                hovertemplate="%{text}",
+            ),
+            row=1,
+            col=1,
+        )
+
+        # =======================
+        # Returns
+        # =======================
+
+        df_stats = pd.DataFrame(self.stats)
+        fig.add_trace(
+            go.Scatter(
+                y=df_stats["total_return"],
+                x=df_stats["date"],
+                name="total_return",
+                line=dict(width=1),
+                line_color=COLORS[2],
+            ),
+            secondary_y=False,
+            row=2,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                y=df_stats["tick_return"],
+                x=df_stats["date"],
+                name="tick_return",
+                line=dict(width=1),
+                line_color=COLORS[1],
+            ),
+            row=2,
+            col=1,
+            secondary_y=True,
+        )
+
+        # =======================
+        # Figure
+        # =======================
+
+        title_text = (
+            f"{title_text}: {label_fn(self.pair)}: {start_date.strftime(date_fmt)}"
+            f" - {end_date.strftime(date_fmt)}"
+        )
+
+        fig.update_layout(
+            template="none",
+            autosize=True,
+            height=800,
+            title_text=title_text,
+        )
+
+        shapes = []
+        for month_end in self.month_ends:
+            shapes.append(
+                dict(
+                    type="line",
+                    yref="paper",
+                    y0=0.55,
+                    y1=0.98,
+                    xref="x",
+                    line_dash="dot",
+                    line_width=1,
+                    x0=month_end,
+                    x1=month_end,
+                )
+            )
+            shapes.append(
+                dict(
+                    type="line",
+                    yref="paper",
+                    y0=0.05,
+                    y1=0.42,
+                    xref="x",
+                    line_dash="dot",
+                    line_width=1,
+                    x0=month_end,
+                    x1=month_end,
+                )
+            )
+
+        fig.update_layout(
+            shapes=shapes,
+            hoverlabel=dict(font_family="Courier New, monospace"),
+            # hovermode="x unified",
+        )
+        fig.update_xaxes(rangebreaks=[dict(values=range_breaks)])
+
+        returns_annotation = get_moments_annotation(
+            df_stats.tick_return,
+            xref="paper",
+            yref="paper",
+            x=1,
+            y=0.4,
+            xanchor="left",
+        )
+        fig.add_annotation(returns_annotation)
+
+        spread_annotation = get_moments_annotation(
+            self.df_ticks.spread,
+            xref="paper",
+            yref="paper",
+            x=1,
+            y=0.8,
+            xanchor="left",
+        )
+        fig.add_annotation(spread_annotation)
+
+        return fig
+
+
+def get_ticks(pair: Tuple, df: pd.DataFrame, window: int):
+    """Creates table of spread, returns, closing prices and trade amounts to be processed
+    iteratively by a Strategy instance.
+    """
+
+    columns = ["adj_close", "adj_return", "med_dollar_volume", "volume"]
+    df_ticks = df.copy().iloc[
+        :,
+        (
+            df.columns.get_level_values(0).isin(columns)
+            & df.columns.get_level_values(1).isin(pair)
+        ),
+    ]
+
+    less_liquid = df_ticks["med_dollar_volume"].sum(axis=0).sort_values().index[0]
+    dollar_position_size = df_ticks[("med_dollar_volume", less_liquid)] / 100
+
+    for S in pair:
+        df_ticks[("position_size", S)] = (
+            dollar_position_size / df_ticks[("adj_close", S)]
+        ).round()
+
+    for S in pair:
+        df_ticks[("rolling_adj_return", S)] = (
+            df_ticks[("adj_return", S)].rolling(window).sum()
+        )
+
+    df_ticks["spread"] = (
+        df_ticks[("rolling_adj_return", pair[1])]
+        - df_ticks[("rolling_adj_return", pair[0])]
+    )
+
+    return df_ticks.dropna()
 
 
 # =============================================================================
