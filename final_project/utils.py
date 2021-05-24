@@ -478,10 +478,12 @@ class Position:
     close_transact_cost: float = 0
     closed: bool = False
     close_date: str = None
-    transact_cost_per_share: float = 0.01
+    transact_cost_percent: float = 0.0003
 
     def __post_init__(self):
-        self.open_transact_cost = self.shares * self.transact_cost_per_share
+        self.open_transact_cost = (
+            self.shares * self.transact_cost_percent * self.open_price
+        )
 
     @property
     def open_value(self):
@@ -521,12 +523,14 @@ class Position:
                 mv = self.shares * (current_price - self.open_price)
             else:
                 mv = self.shares * (self.open_price - current_price)
-            return mv - self.shares * self.transact_cost_per_share
+            return mv - self.shares * self.transact_cost_percent * current_price
 
     def close(self, close_date: str, close_price: float):
         self.close_date = close_date
         self.close_price = close_price
-        self.close_transact_cost = self.shares * self.transact_cost_per_share
+        self.close_transact_cost = (
+            self.shares * self.transact_cost_percent * self.close_price
+        )
         self.closed = True
 
 
@@ -565,7 +569,7 @@ class Strategy:
         window: int,
         closed_positions: list,
         run: bool = True,
-        transact_cost_per_share: float = 0.01,
+        transact_cost_percent: float = 0.0003,
     ):
 
         self.pair = pair
@@ -579,10 +583,10 @@ class Strategy:
         self.long_position: Position = None
         self.short_position: Position = None
         self.closed_positions = closed_positions
-        self.transact_cost_per_share = transact_cost_per_share
+        self.transact_cost_percent = transact_cost_percent
 
-        self.start_date = self.df_ticks.index.min().strftime("%Y-%m-%d")
-        self.end_date = self.df_ticks.index.max().strftime("%Y-%m-%d")
+        self.start_date = self.df_ticks.index.min().strftime("%Y-%m-%d %H:%M")
+        self.end_date = self.df_ticks.index.max().strftime("%Y-%m-%d %H:%M")
 
         self.capital = (
             self.df_ticks["position_size"] * self.df_ticks["adj_close"]
@@ -639,7 +643,7 @@ class Strategy:
             security=security,
             shares=shares,
             open_price=open_price,
-            transact_cost_per_share=self.transact_cost_per_share,
+            transact_cost_percent=self.transact_cost_percent,
         )
 
         self.transact_cost += self.long_position.open_transact_cost
@@ -656,7 +660,7 @@ class Strategy:
             security=security,
             shares=shares,
             open_price=open_price,
-            transact_cost_per_share=self.transact_cost_per_share,
+            transact_cost_percent=self.transact_cost_percent,
         )
 
         self.transact_cost += self.short_position.open_transact_cost
@@ -719,12 +723,12 @@ class Strategy:
         self.stats = []
         for tick in self.df_ticks.iterrows():
             date, tick = tick
-            spread = tick.spread[0]
-            self.current_date = date.strftime("%Y-%m-%d")
+            spread = tick.adj_return.funding_rate
+            prior_spread = tick.adj_return.prior_funding_rate
+            self.current_date = date.strftime("%Y-%m-%d %H:%M")
             self.current_prices = tick.adj_close
-            returns = tick.rolling_adj_return.sort_values()
-            short_security = returns.index[-1]
-            long_security = returns.index[0]
+            short_security = self.pair[1] if spread > 0 else self.pair[0]
+            long_security = self.pair[0] if spread > 0 else self.pair[1]
 
             # Just testing long position since both long and short positions
             # are always open or None. Don't open a position on the last day
@@ -733,6 +737,25 @@ class Strategy:
             # Closing positions first so that opening logic works whether opening
             # from not having an open position or from after having sold because the
             # spread reversed.
+
+            if self.current_date == self.start_date:
+                prior_total_profit = 0
+            else:
+                prior_total_profit = self.stats[-1]["total_profit"]
+
+            if self.long_position is not None:
+                if self.long_position.security == self.pair[1]:
+                    self.gross_profit -= (
+                        self.long_position.shares
+                        * self.current_prices[self.pair[1]]
+                        * prior_spread
+                    )
+                else:
+                    self.gross_profit += (
+                        self.short_position.shares
+                        * self.current_prices[self.pair[1]]
+                        * prior_spread
+                    )
 
             if self.long_position is not None and (
                 (
@@ -774,15 +797,11 @@ class Strategy:
                     open_price=tick.adj_close[short_security],
                 )
 
-            if self.current_date == self.start_date:
-                prior_total_profit = 0
-            else:
-                prior_total_profit = self.stats[-1]["total_profit"]
-
             total_profit = self.net_profit + self.unrealized_profit
             tick_profit = total_profit - prior_total_profit
             total_return = np.log(total_profit + self.capital) - np.log(self.capital)
             tick_return = np.log(tick_profit + self.capital) - np.log(self.capital)
+
             self.stats.append(
                 {
                     "date": date,
@@ -837,7 +856,7 @@ class Strategy:
 
         return (
             date,
-            self.df_ticks.loc[date].spread.values[0],
+            self.df_ticks.loc[date].adj_return.funding_rate,
             trade_type,
             size,
             hover_text,
@@ -846,8 +865,7 @@ class Strategy:
     def plot(
         self,
         title_text: str = "Spread Trading Chart",
-        data_feed: str = "EOD",
-        date_fmt: str = "%Y-%m-%d",
+        date_fmt: str = "%Y-%m-%d %H:%M",
     ) -> go.Figure:
         """
 
@@ -884,9 +902,9 @@ class Strategy:
 
         fig.append_trace(
             go.Scatter(
-                y=self.df_ticks["spread"],
+                y=self.df_ticks.adj_return.funding_rate,
                 x=dates,
-                name="spread",
+                name="funding_rate",
                 line=dict(width=1),
             ),
             row=1,
@@ -1050,17 +1068,17 @@ class Strategy:
         )
         fig.add_annotation(returns_annotation)
 
-        spread_annotation = get_moments_annotation(
-            self.df_ticks.spread,
-            xref="paper",
-            yref="paper",
-            x=1,
-            y=0.8,
-            xanchor="left",
-            labels=IS_labels,
-            title="",
-        )
-        fig.add_annotation(spread_annotation)
+        # spread_annotation = get_moments_annotation(
+        #     self.df_ticks.adj_return.funding_rate,
+        #     xref="paper",
+        #     yref="paper",
+        #     x=1,
+        #     y=0.8,
+        #     xanchor="left",
+        #     labels=IS_labels,
+        #     title="",
+        # )
+        # fig.add_annotation(spread_annotation)
 
         return fig
 
