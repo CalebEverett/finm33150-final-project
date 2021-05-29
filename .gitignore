@@ -83,3 +83,5 @@ submissions
 *.zip
 data
 *.html
+
+!tests/df_ticks.csv

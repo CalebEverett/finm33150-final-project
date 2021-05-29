@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
 from unittest import TestCase
 
 import pandas as pd
 
 from final_project.utils import Strategy
-
-# This is really just a start and only include a few items used while writing.
 
 
 class StrategyTests(TestCase):
