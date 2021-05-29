@@ -150,8 +150,7 @@ class StrategyTests(TestCase):
     def test_realized_profit(self):
         """
         Ensures that realized profits from opening to closing of pair of positions
-        is recorded correctly
-        .
+        is recorded correctly.
 
 
         Realized Profit = Change in Long Position Value + Change in Short Position Value
@@ -168,31 +167,46 @@ class StrategyTests(TestCase):
 
         ticks = self.df_ticks.loc[short_position.open_date : short_position.close_date]
 
-        prior_tick = self.df_ticks.loc[short_position.open_date]
-        next_tick = self.df_ticks.shift(-1).loc[short_position.open_date]
-        next_stats = self.df_stats.shift(-1).loc[short_position.open_date]
+        open_trans_cost = (
+            -long_position.open_transact_cost - short_position.open_transact_cost
+        )
 
         long_position_change = long_position.shares * (
-            next_tick.adj_close[long_position.security]
-            - prior_tick.adj_close[long_position.security]
+            ticks.iloc[-1].adj_close[long_position.security]
+            - ticks.iloc[0].adj_close[long_position.security]
         )
 
         short_position_change = short_position.shares * (
-            prior_tick.adj_close[short_position.security]
-            - next_tick.adj_close[short_position.security]
+            ticks.iloc[0].adj_close[short_position.security]
+            - ticks.iloc[-1].adj_close[short_position.security]
         )
 
-        unrealized_close_trans_cost = (
+        funding_rate_profit = (
+            ticks.iloc[1:].adj_return.prior_funding_rate
+            * short_position.shares
+            * ticks.iloc[1:].adj_close.perpetual
+        ).sum()
+
+        close_trans_cost = (
             -long_position.transact_cost_percent
             * long_position.shares
-            * next_tick.adj_close[long_position.security]
+            * ticks.iloc[-1].adj_close[long_position.security]
             - short_position.transact_cost_percent
             * short_position.shares
-            * next_tick.adj_close[short_position.security]
+            * ticks.iloc[-1].adj_close[short_position.security]
+        )
+
+        self.assertEqual(
+            close_trans_cost,
+            -long_position.close_transact_cost - short_position.close_transact_cost,
         )
 
         self.assertAlmostEqual(
-            long_position_change + short_position_change + unrealized_close_trans_cost,
-            next_stats.unrealized_profit,
+            open_trans_cost
+            + long_position_change
+            + short_position_change
+            + funding_rate_profit
+            + close_trans_cost,
+            self.df_stats.loc[short_position.close_date].total_profit,
             5,
         )
