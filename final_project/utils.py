@@ -889,15 +889,20 @@ class Strategy:
         fig = go.Figure()
 
         fig = make_subplots(
-            rows=2,
+            rows=3,
             cols=1,
             subplot_titles=[
-                "Trades",
-                f"Returns: Total = {self.stats[-1]['total_return']:0.4f}, ${self.stats[-1]['total_profit']:0.0f}",
+                f"Trades: Total = {len(self.closed_positions) // 2}",
+                f"Returns: Total = {self.stats[-1]['total_return']:0.4f}",
+                f"Profit: Total = ${self.stats[-1]['total_profit']:0.0f}",
             ],
             shared_xaxes=True,
             vertical_spacing=0.10,
-            specs=[[dict(secondary_y=True)], [dict(secondary_y=True)]],
+            specs=[
+                [dict(secondary_y=True)],
+                [dict(secondary_y=True)],
+                [dict(secondary_y=True)],
+            ],
         )
 
         # =======================
@@ -909,6 +914,19 @@ class Strategy:
                 y=self.df_ticks.adj_return.funding_rate,
                 x=dates,
                 name="funding_rate",
+                line=dict(width=1),
+            ),
+            row=1,
+            col=1,
+        )
+
+        fig.append_trace(
+            go.Scatter(
+                y=self.df_ticks.adj_return.spread.loc[
+                    self.df_ticks.adj_return.spread < 0.015
+                ],
+                x=dates,
+                name="spread",
                 line=dict(width=1),
             ),
             row=1,
@@ -1009,6 +1027,53 @@ class Strategy:
         )
 
         # =======================
+        # Profit
+        # =======================
+
+        fig.add_trace(
+            go.Scatter(
+                y=df_stats["transact_cost"],
+                x=df_stats["date"],
+                name="transact_cost",
+                line=dict(width=1),
+                fill="tonexty",
+            ),
+            secondary_y=False,
+            row=3,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                y=df_stats["funding_rate_profit"] + df_stats["transact_cost"],
+                x=df_stats["date"],
+                name="net_funding_rate_profit",
+                line=dict(width=1),
+                fill="tonexty",
+                line_color=COLORS[0],
+            ),
+            secondary_y=False,
+            row=3,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                y=df_stats["position_profit"]
+                + df_stats["funding_rate_profit"]
+                + df_stats["transact_cost"],
+                x=df_stats["date"],
+                name="net_fund_plus_position_profit",
+                line=dict(width=1),
+                fill="tonexty",
+                line_color=COLORS[1],
+            ),
+            secondary_y=False,
+            row=3,
+            col=1,
+        )
+
+        # =======================
         # Figure
         # =======================
 
@@ -1020,41 +1085,41 @@ class Strategy:
         fig.update_layout(
             template="none",
             autosize=True,
-            height=800,
+            height=1200,
             title_text=title_text,
         )
 
-        shapes = []
-        for month_end in self.month_ends:
-            shapes.append(
-                dict(
-                    type="line",
-                    yref="paper",
-                    y0=0.55,
-                    y1=0.98,
-                    xref="x",
-                    line_dash="dot",
-                    line_width=1,
-                    x0=month_end,
-                    x1=month_end,
-                )
-            )
-            shapes.append(
-                dict(
-                    type="line",
-                    yref="paper",
-                    y0=0.05,
-                    y1=0.42,
-                    xref="x",
-                    line_dash="dot",
-                    line_width=1,
-                    x0=month_end,
-                    x1=month_end,
-                )
-            )
+        # shapes = []
+        # for month_end in self.month_ends:
+        #     shapes.append(
+        #         dict(
+        #             type="line",
+        #             yref="paper",
+        #             y0=0.55,
+        #             y1=0.98,
+        #             xref="x",
+        #             line_dash="dot",
+        #             line_width=1,
+        #             x0=month_end,
+        #             x1=month_end,
+        #         )
+        #     )
+        #     shapes.append(
+        #         dict(
+        #             type="line",
+        #             yref="paper",
+        #             y0=0.05,
+        #             y1=0.42,
+        #             xref="x",
+        #             line_dash="dot",
+        #             line_width=1,
+        #             x0=month_end,
+        #             x1=month_end,
+        #         )
+        #     )
 
         fig.update_layout(
-            shapes=shapes,
+            # shapes=shapes,
             hoverlabel=dict(font_family="Courier New, monospace"),
             # hovermode="x unified",
         )
@@ -1213,6 +1278,7 @@ def get_moments_annotation(
         bgcolor="white",
         xanchor=xanchor,
         yanchor="top",
+        font_family="Courier New, monospace",
     )
 
 
