@@ -577,7 +577,8 @@ class Strategy:
         self.open_threshold = open_threshold
         self.close_threshold = close_threshold
         self.window = window
-        self.gross_profit: float = 0
+        self.position_profit: float = 0
+        self.funding_rate_profit: float = 0
         self.transact_cost: float = 0
         self.current_date: str = None
         self.long_position: Position = None
@@ -606,7 +607,7 @@ class Strategy:
 
     @property
     def net_profit(self):
-        return self.gross_profit - self.transact_cost
+        return self.position_profit + self.funding_rate_profit - self.transact_cost
 
     @property
     def unrealized_profit(self):
@@ -671,7 +672,7 @@ class Strategy:
 
         self.long_position.close(close_date, close_price)
 
-        self.gross_profit += self.long_position.gross_profit
+        self.position_profit += self.long_position.gross_profit
         self.transact_cost += self.long_position.close_transact_cost
 
         self.closed_positions.append(self.long_position)
@@ -683,7 +684,7 @@ class Strategy:
 
         self.short_position.close(close_date, close_price)
 
-        self.gross_profit += self.short_position.gross_profit
+        self.position_profit += self.short_position.gross_profit
         self.transact_cost += self.short_position.close_transact_cost
 
         self.closed_positions.append(self.short_position)
@@ -745,13 +746,13 @@ class Strategy:
 
             if self.long_position is not None:
                 if self.long_position.security == self.pair[1]:
-                    self.gross_profit -= (
+                    self.funding_rate_profit -= (
                         self.long_position.shares
                         * self.current_prices[self.pair[1]]
                         * prior_spread
                     )
                 else:
-                    self.gross_profit += (
+                    self.funding_rate_profit += (
                         self.short_position.shares
                         * self.current_prices[self.pair[1]]
                         * prior_spread
@@ -805,6 +806,9 @@ class Strategy:
             self.stats.append(
                 {
                     "date": date,
+                    "funding_rate_profit": self.funding_rate_profit,
+                    "position_profit": self.position_profit,
+                    "transact_cost": -self.transact_cost,
                     "realized_profit": self.net_profit,
                     "unrealized_profit": self.unrealized_profit,
                     "total_profit": total_profit,

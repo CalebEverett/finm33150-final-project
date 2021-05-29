@@ -85,7 +85,6 @@ class StrategyTests(TestCase):
 
         self.assertEqual(short_position.security, "perpetual")
 
-        prior_tick = self.df_ticks.loc[short_position.open_date]
         prior_stats = self.df_stats.loc[short_position.open_date]
         next_tick = self.df_ticks.shift(-1).loc[short_position.open_date]
         next_stats = self.df_stats.shift(-1).loc[short_position.open_date]
@@ -196,6 +195,24 @@ class StrategyTests(TestCase):
         self.assertEqual(
             close_trans_cost,
             -long_position.close_transact_cost - short_position.close_transact_cost,
+        )
+
+        self.assertAlmostEqual(
+            funding_rate_profit,
+            self.df_stats.loc[short_position.close_date].funding_rate_profit,
+            5,
+        )
+
+        self.assertAlmostEqual(
+            open_trans_cost + close_trans_cost,
+            self.df_stats.loc[short_position.close_date].transact_cost,
+            5,
+        )
+
+        self.assertAlmostEqual(
+            long_position_change + short_position_change,
+            self.df_stats.loc[short_position.close_date].position_profit,
+            5,
         )
 
         self.assertAlmostEqual(
