@@ -20,7 +20,7 @@ class StrategyTests(TestCase):
         strategy_params = dict(
             pair=("spot", "perpetual"),
             df_ticks=cls.df_ticks,
-            window=9,
+            spread_column=("adj_return", "funding_rate"),
             open_threshold=0.0005,
             close_threshold=0.0002,
             run=True,
@@ -92,7 +92,7 @@ class StrategyTests(TestCase):
         funding_rate_profit = (
             short_position.shares
             * next_tick.adj_close.perpetual
-            * next_tick.adj_return.prior_funding_rate
+            * next_tick.adj_return.funding_rate_prior
         )
 
         self.assertEqual(
@@ -178,7 +178,7 @@ class StrategyTests(TestCase):
         )
 
         funding_rate_profit = (
-            ticks.iloc[1:].adj_return.prior_funding_rate
+            ticks.iloc[1:].adj_return.funding_rate_prior
             * short_position.shares
             * ticks.iloc[1:].adj_close.perpetual
         ).sum()
@@ -222,5 +222,38 @@ class StrategyTests(TestCase):
             + funding_rate_profit
             + close_trans_cost,
             self.df_stats.loc[short_position.close_date].total_profit,
+            5,
+        )
+
+    def test_total_profit(self):
+        """
+        Ensures that summary statistics profit amounts are consistent the amounts
+        from closed positions.
+        """
+
+        pos_profit = (
+            pd.DataFrame(
+                [
+                    {
+                        "net_profit": p.net_profit,
+                        "gross_profit": p.gross_profit,
+                        "open_date": p.open_date,
+                        "close_date": p.close_date,
+                    }
+                    for p in self.strategy.closed_positions
+                ]
+            )
+            .groupby("open_date")
+            .sum()
+            .sum()
+        )
+
+        self.assertAlmostEqual(
+            pos_profit.gross_profit, self.strategy.stats[-1]["position_profit"], 5
+        )
+        self.assertAlmostEqual(
+            pos_profit.net_profit,
+            self.strategy.stats[-1]["position_profit"]
+            + self.strategy.stats[-1]["transact_cost"],
             5,
         )

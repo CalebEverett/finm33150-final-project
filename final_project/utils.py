@@ -545,10 +545,6 @@ class Strategy:
             a position will be opened if one is not already open.
         close_threshold: Absolute value of difference in returns above which
             a position will be opened if one is not already open.
-        window: Trailing number of days over which the returns for
-            purposes of determining the spread between the two securities were
-            calculated.
-        cash: Balance of cash on hand
         gross_profit: Realized gross profit as of `current_date`
         transact_cost: Cash transaction costs incurred as of `current_date`
         start_date: Starting date of the strategy
@@ -564,19 +560,20 @@ class Strategy:
         self,
         pair: Tuple,
         df_ticks: pd.DataFrame,
+        spread_column: Tuple,
         open_threshold: float,
         close_threshold: float,
-        window: int,
         closed_positions: list,
         run: bool = True,
         transact_cost_percent: float = 0.0003,
+        funding_rate_freq: str = "8h",
     ):
 
         self.pair = pair
         self.df_ticks = df_ticks
+        self.spread_column = spread_column
         self.open_threshold = open_threshold
         self.close_threshold = close_threshold
-        self.window = window
         self.position_profit: float = 0
         self.funding_rate_profit: float = 0
         self.transact_cost: float = 0
@@ -596,9 +593,9 @@ class Strategy:
         # Frequency of `BM` is last business day of month to make sure
         # positions are closed if the calendar last day of the month
         # is not a trading day.
-        self.month_ends = (
-            pd.date_range(self.start_date, self.end_date, freq="BM")
-            .strftime("%Y-%m-%d")
+        self.funding_rate_dates = (
+            pd.date_range(self.start_date, self.end_date, freq=funding_rate_freq)
+            .strftime("%Y-%m-%d %H:%M")
             .to_list()
         )
 
@@ -724,8 +721,7 @@ class Strategy:
         self.stats = []
         for tick in self.df_ticks.iterrows():
             date, tick = tick
-            spread = tick.adj_return.funding_rate
-            prior_spread = tick.adj_return.prior_funding_rate
+            spread = tick[self.spread_column]
             self.current_date = date.strftime("%Y-%m-%d %H:%M")
             self.current_prices = tick.adj_close
             short_security = self.pair[1] if spread > 0 else self.pair[0]
@@ -744,24 +740,26 @@ class Strategy:
             else:
                 prior_total_profit = self.stats[-1]["total_profit"]
 
-            if self.long_position is not None:
+            if (
+                self.long_position is not None
+                and self.current_date in self.funding_rate_dates
+            ):
                 if self.long_position.security == self.pair[1]:
                     self.funding_rate_profit -= (
                         self.long_position.shares
                         * self.current_prices[self.pair[1]]
-                        * prior_spread
+                        * tick.adj_return.funding_rate_prior
                     )
                 else:
                     self.funding_rate_profit += (
                         self.short_position.shares
                         * self.current_prices[self.pair[1]]
-                        * prior_spread
+                        * tick.adj_return.funding_rate_prior
                     )
 
             if self.long_position is not None and (
                 (
                     abs(spread) < self.close_threshold
-                    or self.current_date in self.month_ends
                     or self.current_date == self.end_date
                 )
                 or self.long_position.security != long_security
@@ -781,7 +779,6 @@ class Strategy:
                 abs(spread) > self.open_threshold
                 and self.long_position is None
                 and self.current_date != self.end_date
-                and self.current_date not in self.month_ends
             ):
 
                 self.open_long_position(
@@ -836,7 +833,7 @@ class Strategy:
             trades,
             tablefmt="plain",
             headers=headers,
-            floatfmt=("", "", ",.0f", ",.2f", ",.0f"),
+            floatfmt=("", "", ",.4f", ",.0f", ",.0f"),
         ).replace("\n", "<br>")
 
         if opened_positions:
@@ -860,7 +857,7 @@ class Strategy:
 
         return (
             date,
-            self.df_ticks.loc[date].adj_return.funding_rate,
+            self.df_ticks.loc[date, self.spread_column],
             trade_type,
             size,
             hover_text,
@@ -922,9 +919,7 @@ class Strategy:
 
         fig.append_trace(
             go.Scatter(
-                y=self.df_ticks.adj_return.spread.loc[
-                    self.df_ticks.adj_return.spread < 0.015
-                ],
+                y=self.df_ticks.adj_return.spread,
                 x=dates,
                 name="spread",
                 line=dict(width=1),
@@ -1045,9 +1040,9 @@ class Strategy:
 
         fig.add_trace(
             go.Scatter(
-                y=df_stats["funding_rate_profit"] + df_stats["transact_cost"],
+                y=df_stats["position_profit"] + df_stats["transact_cost"],
                 x=df_stats["date"],
-                name="net_funding_rate_profit",
+                name="net_position_profit",
                 line=dict(width=1),
                 fill="tonexty",
                 line_color=COLORS[0],
@@ -1063,7 +1058,7 @@ class Strategy:
                 + df_stats["funding_rate_profit"]
                 + df_stats["transact_cost"],
                 x=df_stats["date"],
-                name="net_fund_plus_position_profit",
+                name="fund_plus_pos_profit",
                 line=dict(width=1),
                 fill="tonexty",
                 line_color=COLORS[1],
@@ -1081,6 +1076,8 @@ class Strategy:
             f"{title_text}: {label_fn(self.pair)}: {start_date.strftime(date_fmt)}"
             f" - {end_date.strftime(date_fmt)}"
         )
+
+        fig.update_yaxes(range=(-0.002, 0.004), row=1, col=1)
 
         fig.update_layout(
             template="none",
@@ -1152,36 +1149,47 @@ class Strategy:
         return fig
 
 
-def get_ticks(pair: Tuple, df: pd.DataFrame, window: int, dollar_position_size: float):
+def get_ticks(
+    df_perpetual: pd.DataFrame,
+    df_spot: pd.DataFrame,
+    df_funding: pd.DataFrame,
+    dollar_position_size: float,
+):
     """Creates table of spread, returns, closing prices and trade amounts to be processed
     iteratively by a Strategy instance.
     """
 
-    columns = ["adj_close", "adj_return"]
-    df_ticks = df.copy().iloc[
-        :,
-        (
-            df.columns.get_level_values(0).isin(columns)
-            & df.columns.get_level_values(1).isin(pair)
-        ),
-    ]
-
-    for S in pair:
-        df_ticks[("position_size", S)] = (
-            dollar_position_size / df_ticks[("adj_close", S)]
+    df_ticks = pd.DataFrame()
+    for asset, df in {"perpetual": df_perpetual, "spot": df_spot}.items():
+        df = df[["open", "close", "per_return"]].copy()
+        df["position_size"] = dollar_position_size / df["close"]
+        df.columns = pd.MultiIndex.from_tuples(
+            [
+                ("adj_open", asset),
+                ("adj_close", asset),
+                ("adj_return", asset),
+                ("position_size", asset),
+            ],
+            names=["series", "asset"],
         )
+        df_ticks = pd.concat([df_ticks, df], axis=1)
 
-    for S in pair:
-        df_ticks[("rolling_adj_return", S)] = (
-            df_ticks[("adj_return", S)].rolling(window).sum()
-        )
+    df_ticks[("adj_return", "funding_rate")] = df_funding.fundingRate
+    df_ticks[("adj_return", "funding_rate")] = df_ticks[
+        ("adj_return", "funding_rate")
+    ].ffill()
+    df_ticks[("adj_return", "funding_rate_prior")] = df_ticks[
+        ("adj_return", "funding_rate")
+    ].shift()
 
-    df_ticks["spread"] = (
-        df_ticks[("rolling_adj_return", pair[1])]
-        - df_ticks[("rolling_adj_return", pair[0])]
+    df_ticks[("adj_return", "spread")] = (
+        df_ticks.adj_close.perpetual / df_ticks.adj_close.spot - 1
     )
 
-    return df_ticks.dropna()
+    df_ticks.index.name = "date"
+    df_ticks = df_ticks.sort_index(axis=1)
+
+    return df_ticks
 
 
 # =============================================================================
