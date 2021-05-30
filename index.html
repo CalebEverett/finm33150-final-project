@@ -14297,7 +14297,6 @@ a.anchor-link {
 <span class="n">pd</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">plotting</span><span class="o">.</span><span class="n">backend</span> <span class="o">=</span> <span class="s2">&quot;plotly&quot;</span>
 <span class="n">pio</span><span class="o">.</span><span class="n">templates</span><span class="o">.</span><span class="n">default</span> <span class="o">=</span> <span class="s2">&quot;seaborn&quot;</span>
 <span class="n">pio</span><span class="o">.</span><span class="n">renderers</span><span class="o">.</span><span class="n">default</span> <span class="o">=</span> <span class="s2">&quot;notebook_connected+vscode&quot;</span>
-<span class="n">default_fig_size</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">height</span><span class="o">=</span><span class="mi">700</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">1200</span><span class="p">)</span>
 </pre></div>
 
      </div>
@@ -14423,7 +14422,6 @@ Name: BTCUSDT, dtype: object</pre>
     <span class="n">df_perpetual</span><span class="p">,</span>
     <span class="n">title</span><span class="o">=</span><span class="s2">&quot;BTCUSDT Perpetual Contracts&quot;</span>
 <span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
@@ -14513,7 +14511,6 @@ if (outputEl) {{
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">fig</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">make_overview_chart</span><span class="p">(</span><span class="n">df_perpetual</span><span class="o">.</span><span class="n">per_return</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;BTCUSDT Perpetual&quot;</span><span class="p">,</span> <span class="n">subtitle_base</span><span class="o">=</span><span class="s2">&quot;Log Returns&quot;</span><span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
@@ -14587,7 +14584,6 @@ if (outputEl) {{
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">df_spot</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">get_klines</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="s2">&quot;BTCUSDT&quot;</span><span class="p">,</span> <span class="n">start_time</span><span class="o">=</span><span class="s2">&quot;2020-05-01&quot;</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="n">interval</span><span class="p">)</span>
 <span class="n">fig</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">make_price_volume_chart</span><span class="p">(</span><span class="n">df_spot</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;BTCUSDT Spot Price OHLC&quot;</span><span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
@@ -14652,7 +14648,6 @@ if (outputEl) {{
     <span class="n">df_spot</span><span class="o">.</span><span class="n">per_return</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;BTCUSDT Spot&quot;</span><span class="p">,</span>
     <span class="n">subtitle_base</span><span class="o">=</span><span class="s2">&quot;Log Returns&quot;</span>
 <span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
@@ -14728,7 +14723,6 @@ if (outputEl) {{
 <span class="n">fig</span> <span class="o">=</span> <span class="n">df_funding</span><span class="o">.</span><span class="n">fundingRate</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;BTCUSDT Funding Rate&quot;</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">update_traces</span><span class="p">(</span><span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">width</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">layout_showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
@@ -14799,7 +14793,6 @@ if (outputEl) {{
     <span class="n">df_funding</span><span class="o">.</span><span class="n">fundingRate</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Funding Rate&quot;</span><span class="p">,</span>
     <span class="n">subtitle_base</span><span class="o">=</span><span class="s2">&quot;Funding Rate&quot;</span>
 <span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
@@ -14877,7 +14870,6 @@ if (outputEl) {{
     <span class="n">spread</span><span class="p">[</span><span class="n">spread</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mf">.015</span><span class="p">],</span> <span class="n">df_funding</span><span class="o">.</span><span class="n">fundingRate</span><span class="p">,</span>
     <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Perpetual - Spot Spread vs. Funding Rate&quot;</span>
 <span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 <span class="c1"># print(f&quot;correlation: {spread[spread.abs() &lt; .015].corr(df_funding.fundingRate):0.4f}&quot;)</span>
 </pre></div>
@@ -14944,7 +14936,6 @@ if (outputEl) {{
     <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Perpetual Spot Spread&quot;</span><span class="p">,</span>
     <span class="n">subtitle_base</span><span class="o">=</span><span class="s2">&quot;Spread&quot;</span>
 <span class="p">)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
@@ -15018,7 +15009,6 @@ if (outputEl) {{
     <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Perpetual - Spot Return Spread vs. Funding Rate&quot;</span>
 <span class="p">)</span>
 <span class="c1"># print(f&quot;correlation: {spread[spread.abs() &lt; .015].corr(df_funding.fundingRate):0.4f}&quot;)</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
@@ -15375,7 +15365,6 @@ if (outputEl) {{
 
 <span class="n">strategy</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">Strategy</span><span class="p">(</span><span class="o">**</span><span class="n">strategy_params</span><span class="p">)</span>
 <span class="n">fig</span> <span class="o">=</span> <span class="n">strategy</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
-<span class="n">fig</span><span class="o">.</span><span class="n">update_layout</span><span class="p">(</span><span class="o">**</span><span class="n">default_fig_size</span><span class="p">)</span>
 <span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 
