@@ -1189,7 +1189,7 @@ def get_ticks(
     df_ticks.index.name = "date"
     df_ticks = df_ticks.sort_index(axis=1)
 
-    return df_ticks
+    return df_ticks.dropna()
 
 
 # =============================================================================
