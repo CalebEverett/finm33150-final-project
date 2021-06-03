@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Plotly &#8212; Perpetual Futures Strategy 0.1.1 documentation</title>
+    <title>Openapi &#8212; Perpetual Futures Strategy 0.1.1 documentation</title>
     
   <link href="_static/css/theme.css" rel="stylesheet" />
   <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
@@ -34,7 +34,6 @@
     <script src="_static/doctools.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Figures" href="figures.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="en" />
     
@@ -68,67 +67,67 @@
         <ul id="navbar-main-elements" class="navbar-nav">
     <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="assets.html">
-  Assets
+  1. Assets
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="literature.html">
-  Literature
+  2. Literature
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="strategy.html">
-  Strategy
+  3. Strategy
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="returns.html">
-  Returns
+  4. Returns
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="sizing.html">
-  Sizing
+  5. Sizing
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="risks.html">
-  Risks
+  6. Risks
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="enhancements.html">
-  Future Enhancements
+  7. Future Enhancements
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="references.html">
-  References
+  8. References
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="tables.html">
-  Tables
+  9. Tables
  </a>
 </li>
 
 <li class="toctree-l1 nav-item">
  <a class="reference internal nav-link" href="figures.html">
-  Figures
+  10. Figures
  </a>
 </li>
 
-<li class="toctree-l1 current active nav-item">
- <a class="current reference internal nav-link" href="#">
-  Plotly
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="plotly.html">
+  11. Plotly
  </a>
 </li>
 
@@ -187,8 +186,18 @@
 <nav id="bd-toc-nav">
     <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
-  <a class="reference internal nav-link" href="#perpetual-overview">
-   Perpetual Overview
+  <a class="reference internal nav-link" href="#schemas">
+   Schemas
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#end-points">
+   End Points
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#end-point-detail">
+   End Point Detail
   </a>
  </li>
 </ul>
@@ -212,15 +221,41 @@
               
               <div>
                 
-  <div class="section" id="plotly">
-<h1>Plotly<a class="headerlink" href="#plotly" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="perpetual-overview">
-<h2>Perpetual Overview<a class="headerlink" href="#perpetual-overview" title="Permalink to this headline">¶</a></h2>
-<p>This is the next chart</p>
-<div class="figure align-default" id="bar">
-<img alt="_images/perpetual.svg" src="_images/perpetual.svg" /><p class="caption"><span class="caption-number">Fig. 1 </span><span class="caption-text">Perpetual contract price every 8 hours.</span><a class="headerlink" href="#bar" title="Permalink to this image">¶</a></p>
+  <div class="section" id="openapi">
+<h1>Openapi<a class="headerlink" href="#openapi" title="Permalink to this headline">¶</a></h1>
+<p><a class="reference external" href="https://www.django-rest-framework.org">django-rest-framework</a> makes it easy to automatically create online schema documentation. Here are the key lines of code from <code class="code docutils literal notranslate"><span class="pre">config.urls</span></code>. <code class="xref py py-func docutils literal notranslate"><span class="pre">get_schema_view()</span></code> creates the schema, which gets served a boilerplate template at the <code class="code docutils literal notranslate"><span class="pre">swagger-ui</span></code> endpoint and you end up with informative, functional and good looking documentation of your schema. Openapi is now the de facto standard for documenting APIs and as such rich tooling exists, including <a class="reference external" href="https://github.com/OpenAPITools/openapi-generator">openapi-generator</a>, which can be used to autogenerate a client library.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">urlpatterns</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">path</span><span class="p">(</span><span class="s2">&quot;grants/&quot;</span><span class="p">,</span> <span class="n">include</span><span class="p">(</span><span class="s2">&quot;grants.urls&quot;</span><span class="p">)),</span>
+    <span class="n">path</span><span class="p">(</span><span class="s2">&quot;admin/&quot;</span><span class="p">,</span> <span class="n">admin</span><span class="o">.</span><span class="n">site</span><span class="o">.</span><span class="n">urls</span><span class="p">),</span>
+    <span class="n">path</span><span class="p">(</span>
+        <span class="s2">&quot;openapi/&quot;</span><span class="p">,</span>
+        <span class="n">get_schema_view</span><span class="p">(</span>
+            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Grants Admin API&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Grants Admin API&quot;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;0.1.1&quot;</span>
+        <span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;openapi-schema&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">path</span><span class="p">(</span>
+        <span class="s2">&quot;swagger-ui/&quot;</span><span class="p">,</span>
+        <span class="n">TemplateView</span><span class="o">.</span><span class="n">as_view</span><span class="p">(</span>
+            <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;swagger-ui.html&quot;</span><span class="p">,</span>
+            <span class="n">extra_context</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;schema_url&quot;</span><span class="p">:</span> <span class="s2">&quot;openapi-schema&quot;</span><span class="p">},</span>
+        <span class="p">),</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;swagger-ui&quot;</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">]</span>
+</pre></div>
 </div>
-<p>(<a class="reference external" href=".//plot_func.py">Source code</a>)</p>
+<div class="section" id="schemas">
+<h2>Schemas<a class="headerlink" href="#schemas" title="Permalink to this headline">¶</a></h2>
+<img alt="Open API Schemas" src="_images/openapi_summary.png" />
+</div>
+<div class="section" id="end-points">
+<h2>End Points<a class="headerlink" href="#end-points" title="Permalink to this headline">¶</a></h2>
+<img alt="Open API Endpoints" src="_images/openapi_endpoints.png" />
+</div>
+<div class="section" id="end-point-detail">
+<h2>End Point Detail<a class="headerlink" href="#end-point-detail" title="Permalink to this headline">¶</a></h2>
+<img alt="Open API Endpoint Detail" src="_images/openapi_endpoint_detail.png" />
 </div>
 </div>
 
@@ -230,7 +265,6 @@
               
               <div class='prev-next-bottom'>
                 
-    <a class='left-prev' id="prev-link" href="figures.html" title="previous page">Figures</a>
 
               </div>
               
