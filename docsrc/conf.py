@@ -13,8 +13,6 @@
 import os
 import sys
 
-sys.path.append("../final_project")
-
 # -- Project information -----------------------------------------------------
 
 project = "Perpetual Futures Strategy"
