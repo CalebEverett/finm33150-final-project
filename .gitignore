@@ -86,3 +86,4 @@ submissions
 data
 
 !tests/df_ticks.csv
+!docsrc/_static/bench.csv

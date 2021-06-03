@@ -23,4 +23,3 @@ This is the next chart
 
 
 .. plotly:: plot_func.py show_funding_rate
-    :iframe-height: 800px
