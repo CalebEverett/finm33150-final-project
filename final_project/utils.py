@@ -208,6 +208,52 @@ def sign_request(tbd):
     ).hexdigest()
 
 
+def get_coin_futures_positions():
+
+    base_url = "https://dapi.binance.com"
+    end_point = "/dapi/v1/positionRisk"
+
+    params = dict(timestamp=round(datetime.now(timezone.utc).timestamp() * 1000))
+    request = Request("GET", f"{base_url}{end_point}", params=params)
+    prepared = request.prepare()
+
+    signature_payload = f"{prepared.path_url.split('?')[-1]}".encode()
+    params["signature"] = hmac.new(
+        os.getenv("BINANCE_API_SECRET").encode(), signature_payload, "sha256"
+    ).hexdigest()
+
+    r = requests.get(
+        f"{base_url}{end_point}",
+        params=params,
+        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+    )
+
+    return r.json()
+
+
+def get_margin_account_details():
+
+    base_url = "https://api.binance.com"
+    end_point = "/sapi/v1/margin/account"
+
+    params = dict(timestamp=round(datetime.now(timezone.utc).timestamp() * 1000))
+    request = Request("GET", f"{base_url}{end_point}", params=params)
+    prepared = request.prepare()
+
+    signature_payload = f"{prepared.path_url.split('?')[-1]}".encode()
+    params["signature"] = hmac.new(
+        os.getenv("BINANCE_API_SECRET").encode(), signature_payload, "sha256"
+    ).hexdigest()
+
+    r = requests.get(
+        f"{base_url}{end_point}",
+        params=params,
+        headers={"X-MBX-APIKEY": os.getenv("BINANCE_API_KEY")},
+    )
+
+    return r.json()
+
+
 def get_exchange_info():
     """
     Gets current exchange trading rules and symbol information.

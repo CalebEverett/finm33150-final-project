@@ -55,7 +55,9 @@ output/*.html
 output/*/index.html
 
 # Sphinx
-docs/_build
+docs
+!docs/index.html
+
 
 .DS_Store
 *~
@@ -82,6 +84,5 @@ submissions
 *.csv
 *.zip
 data
-*.html
 
 !tests/df_ticks.csv

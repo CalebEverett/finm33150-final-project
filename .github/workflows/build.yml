@@ -25,10 +25,14 @@ jobs:
       run: |
         pipenv run pytest
     - name: Convert notebook
+      if: false
       run: |
         pipenv run jupyter nbconvert binance.ipynb --to html --output html/index.html
-    - name: Deploy html notebook to gh-pages
+    - name: Make docs
+      run: |
+        pipenv run make html
+    - name: Deploy docs to gh-pages
       uses: JamesIves/github-pages-deploy-action@4.1.2
       with:
         branch: gh-pages
-        folder: html
+        folder: docs
