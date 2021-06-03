@@ -35,9 +35,16 @@ Our initial execution of this strategy includes five crypto tokens on three diff
 Returns
 =======
 
-Our backtesting indicates that we would have generated annualized returns of x% over the last three years on a capital base of $10 million with conservative leverage of 1.5x. We believe we would have been able to put an additional $100 million to work with a reduction in returns to y% per annum. Below is a summary of our base case returns:
+Our backtesting indicates that we would have generated annualized returns of x% over the last three years on a capital base of $10 million with conservative leverage of 1.5x.
 
 [number of trades, returns, sharpe ratio, information ratio, sortino ratio, beta vs. crypto, beta vs. spy, downside beta vs crypto, downside beta vs.spy]
+
+Sizing
+======
+
+We believe we would have been able to put an additional $100 million to work with a reduction in returns to y% per annum. Below is a summary of our base case returns:
+
+[sensitivity analysis to key return metrics from trade sizes, should show higher slippage - transaction fees should stay the same since they are a function of dollars traded, although maybe they could actually be lower since trading fees as a % of dollars traded decreases.]
 
 Risks
 =====
@@ -73,7 +80,7 @@ The primary risks to this strategy are:
 .. math:: \frac{1}{2}
     :label: 
 
-Further Enhancements
+Enhancements
 ====================
 
 1. As the academic literature indicates, changes in the price of the perpetual futures contract are not perfectly correlated with changes in the spot price. As such, there me be opportunity to increase returns at the margin by effecting a mean-variance optimized hedging strategy that results in a short position that is not the same size as the futures contract.
