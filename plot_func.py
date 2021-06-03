@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.io as pio
 
 
-from final_project import utils
+from ..final_project import utils
 
 pd.options.plotting.backend = "plotly"
 pio.templates.default = "seaborn"

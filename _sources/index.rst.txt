@@ -12,9 +12,9 @@ Contents
       sizing
       risks
       enhancements
-      references
       tables
       figures
+      references
       plotly
 
 Overview
