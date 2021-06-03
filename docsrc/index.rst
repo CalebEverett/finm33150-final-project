@@ -2,6 +2,7 @@ Contents
 ========
 
 ..    toctree::
+      :numbered:
       :maxdepth: 2
    
       assets
@@ -24,8 +25,8 @@ This is a quantitative trading strategy involving perpetual futures contracts :c
 This strategy is designed to capture the funding rate while taking on only de minimis risk related to movements in the prices of the crypto tokens themselves. It is effected by establishing a short position in the perpetual futures contract when the funding rate is attractive in order to capture the funding rate payments while establishing a corresponding short position of equivalent size in the underlying crypto token in order to hedge against price fluctuations.
 
 
-Tradeable Assets
-================
+Assets
+======
 
 Our initial execution of this strategy includes five crypto tokens on three different exchanges as detailed in the table below.
 
