@@ -27,3 +27,5 @@ The primary risks to this strategy are:
     * Insurance fund
 
 6. Trading volumes aren’t as big as they are reported to be
+
+7. Relatively short trading history on which to conduct back tests

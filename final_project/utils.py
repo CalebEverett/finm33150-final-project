@@ -499,7 +499,18 @@ def get_funding_rate_history(
 
     df.fundingTime = pd.to_datetime(df.fundingTime, unit="ms").round("1s")
 
-    return df.set_index("fundingTime")[["fundingRate"]]
+    df = df.set_index("fundingTime")
+
+    if False:
+        s_funding_rate = df.fundingRate
+
+        s_funding_rate.name = symbol
+
+        return s_funding_rate
+
+    else:
+
+        return df[["fundingRate"]]
 
 
 # =============================================================================
@@ -512,54 +523,53 @@ class PositionType(Enum):
     SHORT: str = "short"
 
 
+class TradeType(Enum):
+    NEW: str = "new"
+    REBALANCE: str = "rebalance"
+
+
 @dataclass
 class Position:
     position_type: PositionType
     open_date: str
     security: str
-    shares: int
+    shares: float
+    carryover_open_shares: float
     open_price: float
     open_transact_cost: float = 0
     close_price: float = None
     close_transact_cost: float = 0
     closed: bool = False
     close_date: str = None
-    transact_cost_percent: float = 0.0003
+    transact_cost_pct: float = 0.0003
+    leverage: float = 1
+    open_margin_amount: float = 0
+    rebalance_margin_pct: float = 0
+    rebalance_margin_amount: float = 0
+    liquidation_margin_pct: float = 0
+    liquidation_margin_amount: float = 0
+    liquidation_cost_pct: float = 0.003
+    liquidation_cost: float = 0
+    transact_cost: float = 0
+    carryover_close_shares: float = 0
+    gross_profit: float = 0
+    net_profit: float = 0
 
     def __post_init__(self):
         self.open_transact_cost = (
-            self.shares * self.transact_cost_percent * self.open_price
+            (self.shares - self.carryover_open_shares)
+            * self.transact_cost_pct
+            * self.open_price
         )
-
-    @property
-    def open_value(self):
-        return self.shares * self.open_price
-
-    @property
-    def close_value(self):
-        return self.shares * self.close_price
-
-    @property
-    def transact_cost(self):
-        return self.open_transact_cost + self.close_transact_cost
-
-    @property
-    def gross_profit(self):
-        if self.closed:
-            if self.position_type == PositionType.LONG:
-                profit = self.close_value - self.open_value
-            else:
-                profit = self.open_value - self.close_value
-            return profit
-        else:
-            raise Exception("Position is still open.")
-
-    @property
-    def net_profit(self):
-        if self.closed:
-            return self.gross_profit - self.transact_cost
-        else:
-            raise Exception("Position is still open.")
+        self.transact_cost = self.open_transact_cost
+        self.open_value = self.shares * self.open_price
+        self.open_margin_amount = self.open_value / self.leverage
+        self.rebalance_margin_amount = (
+            self.open_margin_amount * self.rebalance_margin_pct
+        )
+        self.liquidation_margin_amount = (
+            self.open_margin_amount * self.liquidation_margin_pct
+        )
 
     def unrealized_profit(self, current_price: float):
         if self.closed:
@@ -569,14 +579,43 @@ class Position:
                 mv = self.shares * (current_price - self.open_price)
             else:
                 mv = self.shares * (self.open_price - current_price)
-            return mv - self.shares * self.transact_cost_percent * current_price
+            return mv - self.shares * self.transact_cost_pct * current_price
 
-    def close(self, close_date: str, close_price: float):
+    def current_margin_amount(self, current_price: float):
+        if self.closed:
+            raise Exception("Position is closed.")
+        else:
+            return self.open_margin_amount + self.unrealized_profit(current_price)
+
+    def close(
+        self, close_date: str, close_price: float, carryover_close_shares: float = 0
+    ):
+        self.carryover_close_shares = carryover_close_shares
         self.close_date = close_date
         self.close_price = close_price
+        self.close_value = self.shares * self.close_price
+
         self.close_transact_cost = (
-            self.shares * self.transact_cost_percent * self.close_price
+            (self.shares - self.carryover_close_shares)
+            * self.transact_cost_pct
+            * self.close_price
         )
+
+        if self.current_margin_amount(close_price) < self.liquidation_margin_amount:
+
+            self.liquidation_cost = (
+                self.shares * self.liquidation_cost_pct * self.close_price
+            )
+
+        self.transact_cost = self.open_transact_cost + self.close_transact_cost
+
+        if self.position_type == PositionType.LONG:
+            self.gross_profit = self.close_value - self.open_value
+        else:
+            self.gross_profit = self.open_value - self.close_value
+
+        self.net_profit = self.gross_profit - self.transact_cost - self.liquidation_cost
+
         self.closed = True
 
 
@@ -611,8 +650,13 @@ class Strategy:
         close_threshold: float,
         closed_positions: list,
         run: bool = True,
-        transact_cost_percent: float = 0.0003,
+        transact_cost_pct: float = 0.0003,
         funding_rate_freq: str = "8h",
+        capital: float = 0,
+        leverage: float = 3,
+        rebalance_margin_pct: float = 0.55,
+        liquidation_margin_pct: float = 0.50,
+        liquidation_cost_pct: float = 0.003,
     ):
 
         self.pair = pair
@@ -623,18 +667,21 @@ class Strategy:
         self.position_profit: float = 0
         self.funding_rate_profit: float = 0
         self.transact_cost: float = 0
+        self.liquidation_cost: float = 0
         self.current_date: str = None
         self.long_position: Position = None
         self.short_position: Position = None
         self.closed_positions = closed_positions
-        self.transact_cost_percent = transact_cost_percent
+        self.transact_cost_pct = transact_cost_pct
+        self.leverage = leverage
+        self.rebalance_margin_pct = rebalance_margin_pct
+        self.liquidation_margin_pct = liquidation_margin_pct
+        self.liquidation_cost_pct = liquidation_cost_pct
 
         self.start_date = self.df_ticks.index.min().strftime("%Y-%m-%d %H:%M")
         self.end_date = self.df_ticks.index.max().strftime("%Y-%m-%d %H:%M")
 
-        self.capital = (
-            self.df_ticks["position_size"] * self.df_ticks["adj_close"]
-        ).max().max() * 2
+        self.capital = capital
 
         # Frequency of `BM` is last business day of month to make sure
         # positions are closed if the calendar last day of the month
@@ -650,7 +697,12 @@ class Strategy:
 
     @property
     def net_profit(self):
-        return self.position_profit + self.funding_rate_profit - self.transact_cost
+        return (
+            self.position_profit
+            + self.funding_rate_profit
+            - self.transact_cost
+            - self.liquidation_cost
+        )
 
     @property
     def unrealized_profit(self):
@@ -664,7 +716,12 @@ class Strategy:
             return 0
 
     def open_long_position(
-        self, open_date: str, security: str, shares: int, open_price
+        self,
+        open_date: str,
+        security: str,
+        shares: float,
+        open_price: float,
+        carryover_open_shares: float = 0,
     ):
         if self.long_position is not None:
             raise Exception("An open long position already exists.")
@@ -687,13 +744,23 @@ class Strategy:
             security=security,
             shares=shares,
             open_price=open_price,
-            transact_cost_percent=self.transact_cost_percent,
+            carryover_open_shares=carryover_open_shares,
+            transact_cost_pct=self.transact_cost_pct,
+            leverage=self.leverage if security == self.pair[1] else 1,
+            rebalance_margin_pct=self.rebalance_margin_pct,
+            liquidation_margin_pct=self.liquidation_margin_pct,
+            liquidation_cost_pct=self.liquidation_cost_pct,
         )
 
         self.transact_cost += self.long_position.open_transact_cost
 
     def open_short_position(
-        self, open_date: str, security: str, shares: int, open_price
+        self,
+        open_date: str,
+        security: str,
+        shares: float,
+        open_price: float,
+        carryover_open_shares: float = 0,
     ):
         if self.short_position is not None:
             raise Exception("An open short position already exists.")
@@ -704,31 +771,42 @@ class Strategy:
             security=security,
             shares=shares,
             open_price=open_price,
-            transact_cost_percent=self.transact_cost_percent,
+            carryover_open_shares=carryover_open_shares,
+            transact_cost_pct=self.transact_cost_pct,
+            leverage=self.leverage if security == self.pair[1] else 1,
+            rebalance_margin_pct=self.rebalance_margin_pct,
+            liquidation_margin_pct=self.liquidation_margin_pct,
+            liquidation_cost_pct=self.liquidation_cost_pct,
         )
 
         self.transact_cost += self.short_position.open_transact_cost
 
-    def close_long_position(self, close_date: str, close_price: float):
+    def close_long_position(
+        self, close_date: str, close_price: float, carryover_close_shares: float = 0
+    ):
         if self.long_position is None:
             raise Exception("There is no open long position.")
 
-        self.long_position.close(close_date, close_price)
+        self.long_position.close(close_date, close_price, carryover_close_shares)
 
         self.position_profit += self.long_position.gross_profit
         self.transact_cost += self.long_position.close_transact_cost
+        self.liquidation_cost += self.long_position.liquidation_cost
 
         self.closed_positions.append(self.long_position)
         self.long_position = None
 
-    def close_short_position(self, close_date: str, close_price: float):
+    def close_short_position(
+        self, close_date: str, close_price: float, carryover_close_shares: float = 0
+    ):
         if self.short_position is None:
             raise Exception("There is no open long short.")
 
-        self.short_position.close(close_date, close_price)
+        self.short_position.close(close_date, close_price, carryover_close_shares)
 
         self.position_profit += self.short_position.gross_profit
         self.transact_cost += self.short_position.close_transact_cost
+        self.liquidation_cost += self.short_position.liquidation_cost
 
         self.closed_positions.append(self.short_position)
         self.short_position = None
@@ -781,11 +859,13 @@ class Strategy:
             # from not having an open position or from after having sold because the
             # spread reversed.
 
+            # set prior_total_profit
             if self.current_date == self.start_date:
                 prior_total_profit = 0
             else:
                 prior_total_profit = self.stats[-1]["total_profit"]
 
+            # funding rate payments
             if (
                 self.long_position is not None
                 and self.current_date in self.funding_rate_dates
@@ -803,6 +883,7 @@ class Strategy:
                         * tick.adj_return.funding_rate_prior
                     )
 
+            # close position if open and spread is below close threshold
             if self.long_position is not None and (
                 (
                     abs(spread) < self.close_threshold
@@ -813,14 +894,67 @@ class Strategy:
 
                 self.close_long_position(
                     close_date=self.current_date,
-                    close_price=tick.adj_close[self.long_position.security],
+                    close_price=self.current_prices[self.long_position.security],
                 )
 
                 self.close_short_position(
                     close_date=self.current_date,
-                    close_price=tick.adj_close[self.short_position.security],
+                    close_price=self.current_prices[self.short_position.security],
                 )
 
+            # rebalance if open and current margin amount is less than rebalance
+            if self.long_position is not None and (
+                (
+                    self.long_position.current_margin_amount(
+                        self.current_prices[self.long_position.security]
+                    )
+                    < self.long_position.rebalance_margin_amount
+                )
+                or (
+                    self.short_position.current_margin_amount(
+                        self.current_prices[self.short_position.security]
+                    )
+                    < self.short_position.rebalance_margin_amount
+                )
+            ):
+
+                security = self.long_position.security
+                carryover_shares = min(
+                    tick.position_size[security], self.long_position.shares
+                )
+
+                self.close_long_position(
+                    close_date=self.current_date,
+                    close_price=self.current_prices[security],
+                    carryover_close_shares=carryover_shares,
+                )
+                self.open_long_position(
+                    open_date=self.current_date,
+                    security=security,
+                    shares=tick.position_size[security],
+                    open_price=self.current_prices[security],
+                    carryover_open_shares=carryover_shares,
+                )
+
+                security = self.short_position.security
+                carryover_shares = min(
+                    tick.position_size[security], self.short_position.shares
+                )
+
+                self.close_short_position(
+                    close_date=self.current_date,
+                    close_price=self.current_prices[security],
+                    carryover_close_shares=carryover_shares,
+                )
+                self.open_short_position(
+                    open_date=self.current_date,
+                    security=security,
+                    shares=tick.position_size[security],
+                    open_price=self.current_prices[security],
+                    carryover_open_shares=carryover_shares,
+                )
+
+            # open new positions if spread is above threshold
             if (
                 abs(spread) > self.open_threshold
                 and self.long_position is None
@@ -852,6 +986,7 @@ class Strategy:
                     "funding_rate_profit": self.funding_rate_profit,
                     "position_profit": self.position_profit,
                     "transact_cost": -self.transact_cost,
+                    "liquidation_cost": -self.liquidation_cost,
                     "realized_profit": self.net_profit,
                     "unrealized_profit": self.unrealized_profit,
                     "total_profit": total_profit,
@@ -1199,11 +1334,14 @@ def get_ticks(
     df_perpetual: pd.DataFrame,
     df_spot: pd.DataFrame,
     df_funding: pd.DataFrame,
-    dollar_position_size: float,
+    capital: float,
+    leverage: float = 3,
 ):
     """Creates table of spread, returns, closing prices and trade amounts to be processed
     iteratively by a Strategy instance.
     """
+
+    dollar_position_size = (capital / (leverage + 1)) * leverage
 
     df_ticks = pd.DataFrame()
     for asset, df in {"perpetual": df_perpetual, "spot": df_spot}.items():
