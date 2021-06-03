@@ -181,9 +181,44 @@
               
               <div class="toc-item">
                 
+<div class="tocsection onthispage pt-5 pb-3">
+    <i class="fas fa-list"></i> On this page
+</div>
 
 <nav id="bd-toc-nav">
-    
+    <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#regulation">
+   1.1. Regulation
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#expiration">
+   1.2. Expiration
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#pricing">
+   1.3. Pricing
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#leverage">
+   1.4. Leverage
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#liquidation">
+   1.5. Liquidation
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#funding-rate">
+   1.6. Funding Rate
+  </a>
+ </li>
+</ul>
+
 </nav>
               </div>
               
@@ -205,7 +240,36 @@
                 
   <div class="section" id="assets">
 <h1><span class="section-number">1. </span>Assets<a class="headerlink" href="#assets" title="Permalink to this headline">¶</a></h1>
-<p>A perpetual futures contract is like a traditional futures contract except that it has no expiration date. They were first proposed by Robert Schiller in 1992 to enable derivative markets for illiquid assets <span id="id1">[<a class="reference internal" href="references.html#id2" title="Robert J Shiller. Measuring Asset Values for Cash Settlement in Derivative Markets: Hedonic Repeated Measures Indices and Perpetual Futures. Journal of Finance, 48(3):911-931, July 1993. URL: https://ideas.repec.org/a/bla/jfinan/v48y1993i3p911-31.html, doi:.">Shiller, 1993</a>]</span>.</p>
+<p>A <a class="reference external" href="http://en.wikipedia.org/w/index.php?title=Perpetual%20futures&amp;oldid=1006938691">perpetual futures contract</a> is like a traditional futures contract except that it has no expiration date They were first proposed by Robert Schiller in 1992 to enable derivative markets for illiquid assets <span id="id1">[<a class="reference internal" href="references.html#id2" title="Robert J Shiller. Measuring Asset Values for Cash Settlement in Derivative Markets: Hedonic Repeated Measures Indices and Perpetual Futures. Journal of Finance, 48(3):911-931, July 1993. URL: https://ideas.repec.org/a/bla/jfinan/v48y1993i3p911-31.html, doi:.">Shiller, 1993</a>]</span>. To date, they have only developed for the crypto token markets and first started trading on the BitMEX exchange in 2016 <span id="id2">[<a class="reference internal" href="references.html#id3" title="Carol Alexander, Jaehyuk Choi, Heungju Park, and Sungbin Sohn. BitMEX Bitcoin Derivatives: Price Discovery, Informational Efficiency and Hedging Effectiveness. Journal of Futures Markets, 40(1):23-43, March 2020. URL: https://ssrn.com/abstract=3353583, doi:http://dx.doi.org/10.2139/ssrn.3353583.">Alexander <em>et al.</em>, 2020</a>]</span>. Today, they are traded on all the major crypto exchanges for all of the major crypto tokens in significant aggregate volume. The average daily dollar volume of traded perpetual futures year to date is over [$100 billion] as of 2021-06-02. Another indicator of the rapid pace at which the market is maturing, Bitcoin futures with fixed expiration dates also trade on the <a class="reference external" href="https://www.cmegroup.com/trading/equity-index/us-index/bitcoin.html">CME</a>, albeit at lower volumes (~$3bn per day year to date) than the crypto exchanges.</p>
+<p>[Top five tokens on top five exchange in the last 24 hours]</p>
+<p>[Growth of BTCUSDT on Binance since 2019]</p>
+<div class="section" id="regulation">
+<h2><span class="section-number">1.1. </span>Regulation<a class="headerlink" href="#regulation" title="Permalink to this headline">¶</a></h2>
+<p>Derivative trading is heavily regulated in the United States and requires being registered with the Commodity Futures Trading Commission among other requirements. None of the crypto exchanges are registered and consequently, it is not possible to trade on them from the United States. Our assumption is that this strategy would nonetheless appeal to institutional investors with existing offshore operations or that if the opportunity is deemed sufficiently attractive, such operations could be established. This is also relevant as a risk to the overall strategy as some exchanges have run afoul of regulators for making their services available in the United States, which may impact their operations in the future in a manner adverse users of their services (see <a class="reference external" href="https://www.bloomberg.com/news/articles/2021-04-15/will-crypto-be-regulated-the-bitmex-case-could-bring-laws-to-bitcoin">What’s at Stake in the U.S. Case Against a Crypto Rebel</a> for a current description of BitMEX’s trouble).</p>
+</div>
+<div class="section" id="expiration">
+<h2><span class="section-number">1.2. </span>Expiration<a class="headerlink" href="#expiration" title="Permalink to this headline">¶</a></h2>
+<p>With no expiration date, there is no need to roll fixed expiration date contracts forward.</p>
+</div>
+<div class="section" id="pricing">
+<h2><span class="section-number">1.3. </span>Pricing<a class="headerlink" href="#pricing" title="Permalink to this headline">¶</a></h2>
+<p>Many of the futures contracts are priced in units of USD or <a class="reference external" href="http://cnn.com/">USDT</a>, Tether, a <a class="reference external" href="http://en.wikipedia.org/w/index.php?title=Stablecoin&amp;oldid=1024888758">stablecoin</a> (a crypto token that by contract maintains a value of essentially $1) with the crypto token as the base currency.</p>
+<p>[Candlestick charts for top six coins on binance]</p>
+</div>
+<div class="section" id="leverage">
+<h2><span class="section-number">1.4. </span>Leverage<a class="headerlink" href="#leverage" title="Permalink to this headline">¶</a></h2>
+<p>Most of the contracts offer the ability to utilize high levels of leverage. Up to 125x leverage can be used for the BTCUSDT perpetual futures contract on <a class="reference external" href="https://www.binance.com/en/support/faq/360033162192">Binance</a>, for example. Higher leverage levels obviously increase the risk of margin calls, which can result in forced liquidation. One of they key executional aspects of this strategy is managing the dollar balances of the spot and futures positions to avoid forced liquidation and to keep them matched.</p>
+</div>
+<div class="section" id="liquidation">
+<h2><span class="section-number">1.5. </span>Liquidation<a class="headerlink" href="#liquidation" title="Permalink to this headline">¶</a></h2>
+<p>Another key feature of perpetual futures contracts is that there is no central counter party in the middle of the clearing. Transactions are settled automatically directly between end market participants by contract. The benefit of this is the the risk of default is essentially non-existent, since everything happens digitally, by code. Positions are liquidated automatically before they reach a zero balance - referred to as the maintenance margin. On Binance the maintenance margin is typically 50% of the initial margin. There is some risk in light of the inherently high volatility, that positions are not able to be liquidated before they reach a negative balance. The exchanges set up insurance pools, funded by the maintenance margin on automatically liquidated positions and potentially from the liquidation of profitable, highly leveraged positions if the insurance pool is ever short of funds (<a class="reference external" href="https://academy.binance.com/en/articles/the-ultimate-guide-to-trading-on-binance-futures">auto de-leveraging</a>). Our strategy entails relatively modest leverage (less than 10x on the perpetual futures contracts) and given our frequent rebalancing of our spot and futures balances, we are unlikely to be subject to auto de-leveraging.</p>
+<p>To reduce volatility and the number of forced liquidation events, the liquidation price is typically based on a mark price as opposed to last price, where the mark price is based on a <a class="reference external" href="https://www.binance.com/en/support/faq/547ba48141474ab3bddc5d7898f97928">composite index of prices</a> from multiple exchanges.</p>
+</div>
+<div class="section" id="funding-rate">
+<h2><span class="section-number">1.6. </span>Funding Rate<a class="headerlink" href="#funding-rate" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference external" href="https://www.binance.com/en/support/faq/360033525031">funding rate</a> is the mechanism that keeps the futures price tethered to the spot price absent a set expiration date upon which the contract is settled and the spot must equal the futures price. As Schiller envisioned it, the funding rate represented the flow of value from one side to the other. The crypto exchanges use a formula based on the order book that results in a bigger funding rate if the market is more bullish and a smaller, or even negative rate in which the shorts pay the longs, when the market is more bearish. Funding on most exchanges occurs every eight hours. The rates are set in advance and are paid based on the notional value of the contract at the time of payment. The amounts are paid directly from one side to the other without the exchanges extracting any rent.</p>
+<p>[Funding rate versus the spread for top six coins on binance]</p>
+</div>
 </div>
 
 
