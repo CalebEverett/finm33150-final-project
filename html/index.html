@@ -1,0 +1,362 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contents &#8212; Perpetual Futures Strategy 0.1.1 documentation</title>
+    
+  <link href="_static/css/theme.css" rel="stylesheet" />
+  <link href="_static/css/index.c5995385ac14fb8791e8eb36b4908be2.css" rel="stylesheet" />
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    
+      
+
+    
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css" />
+    <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
+    
+  <link rel="preload" as="script" href="_static/js/index.1c5a1a01449ed65a7b51.js">
+
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Assets" href="assets.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="en" />
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+    <nav class="navbar navbar-light navbar-expand-lg bg-light fixed-top bd-navbar" id="navbar-main"><div class="container-xl">
+
+  <div id="navbar-start">
+    
+    
+<a class="navbar-brand" href="#">
+<p class="title">Perpetual Futures Strategy</p>
+</a>
+
+    
+  </div>
+
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar-collapsible" aria-controls="navbar-collapsible" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  
+  <div id="navbar-collapsible" class="col-lg-9 collapse navbar-collapse">
+    <div id="navbar-center" class="mr-auto">
+      
+      <div class="navbar-center-item">
+        <ul id="navbar-main-elements" class="navbar-nav">
+    <li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="assets.html">
+  Assets
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="literature.html">
+  Literature
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="strategy.html">
+  Strategy
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="returns.html">
+  Returns
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="sizing.html">
+  Sizing
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="risks.html">
+  Risks
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="enhancements.html">
+  Future Enhancements
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="references.html">
+  References
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="tables.html">
+  Tables
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="figures.html">
+  Figures
+ </a>
+</li>
+
+<li class="toctree-l1 nav-item">
+ <a class="reference internal nav-link" href="plotly.html">
+  Plotly
+ </a>
+</li>
+
+    
+</ul>
+      </div>
+      
+    </div>
+
+    <div id="navbar-end">
+      
+      <div class="navbar-end-item">
+        <ul id="navbar-icon-links" class="navbar-nav" aria-label="Icon Links">
+        <li class="nav-item">
+          <a class="nav-link" href="https://github.com/CalebEverett/finm33150-final-project" rel="noopener" target="_blank" title="GitHub">
+            <span><i class="fab fa-github-square"></i></span>
+            <label class="sr-only">GitHub</label>
+          </a>
+        </li>
+      </ul>
+      </div>
+      
+    </div>
+  </div>
+</div>
+    </nav>
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+            
+            <!-- Only show if we have sidebars configured, else just a small margin  -->
+            <div class="col-12 col-md-3 bd-sidebar"><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+  <div class="bd-toc-item active">
+    
+  </div>
+</nav>
+            </div>
+            
+          
+
+          
+          <div class="d-none d-xl-block col-xl-2 bd-toc">
+            
+              
+              <div class="toc-item">
+                
+<div class="tocsection onthispage pt-5 pb-3">
+    <i class="fas fa-list"></i> On this page
+</div>
+
+<nav id="bd-toc-nav">
+    <ul class="visible nav section-nav flex-column">
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#">
+   Contents
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#overview">
+   Overview
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#tradeable-assets">
+   Tradeable Assets
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#returns">
+   Returns
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#risks">
+   Risks
+  </a>
+ </li>
+ <li class="toc-h1 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#further-enhancements">
+   Further Enhancements
+  </a>
+ </li>
+</ul>
+
+</nav>
+              </div>
+              
+              <div class="toc-item">
+                
+              </div>
+              
+            
+          </div>
+          
+
+          
+          
+            
+          
+          <main class="col-12 col-md-9 col-xl-7 py-md-5 pl-md-5 pr-md-4 bd-content" role="main">
+              
+              <div>
+                
+  <div class="section" id="contents">
+<h1>Contents<a class="headerlink" href="#contents" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="assets.html">Assets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="literature.html">Literature</a></li>
+<li class="toctree-l1"><a class="reference internal" href="strategy.html">Strategy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="returns.html">Returns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sizing.html">Sizing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="risks.html">Risks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="enhancements.html">Future Enhancements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tables.html">Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="figures.html">Figures</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plotly.html">Plotly</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="plotly.html#perpetual-overview">Perpetual Overview</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h1>
+<p>This is a quantitative trading strategy involving perpetual futures contracts <span id="id1">[<a class="reference internal" href="references.html#id3" title="Wikipedia. Perpetual futures — Wikipedia, the free encyclopedia. \url http://en.wikipedia.org/w/index.php?title=Perpetual%20futures&amp;oldid=1006938691, 2021. [Online; accessed 02-June-2021].">Wikipedia, 2021</a>]</span> on crypto tokens. Perpetual futures contracts are instruments that trade on the major crypto token exchanges that are similar to traditional futures contracts, but have no expiration date. In order to keep the futures contract price in line with the spot price a funding rate is employed. Long holders of the perpetual futures contracts pay the funding rate to the short holders of the perpetual futures contracts. The funding rate is determined by formula based on the spread between the perpetual futures contract price and the spot price, increasing as the spread increases and contracting as the spread narrows, and flipping such that the short holders pay the long holders if the spread becomes sufficiently negative.</p>
+<p>This strategy is designed to capture the funding rate while taking on only de minimis risk related to movements in the prices of the crypto tokens themselves. It is effected by establishing a short position in the perpetual futures contract when the funding rate is attractive in order to capture the funding rate payments while establishing a corresponding short position of equivalent size in the underlying crypto token in order to hedge against price fluctuations.</p>
+</div>
+<div class="section" id="tradeable-assets">
+<h1>Tradeable Assets<a class="headerlink" href="#tradeable-assets" title="Permalink to this headline">¶</a></h1>
+<p>Our initial execution of this strategy includes five crypto tokens on three different exchanges as detailed in the table below.</p>
+<p>[insert table of crypto tokens and exchanges]</p>
+</div>
+<div class="section" id="returns">
+<h1>Returns<a class="headerlink" href="#returns" title="Permalink to this headline">¶</a></h1>
+<p>Our backtesting indicates that we would have generated annualized returns of x% over the last three years on a capital base of $10 million with conservative leverage of 1.5x. We believe we would have been able to put an additional $100 million to work with a reduction in returns to y% per annum. Below is a summary of our base case returns:</p>
+<p>[number of trades, returns, sharpe ratio, information ratio, sortino ratio, beta vs. crypto, beta vs. spy, downside beta vs crypto, downside beta vs.spy]</p>
+</div>
+<div class="section" id="risks">
+<h1>Risks<a class="headerlink" href="#risks" title="Permalink to this headline">¶</a></h1>
+<p>The primary risks to this strategy are:</p>
+<ol class="arabic">
+<li><p>Need to transact from jurisdiction outside US to comply with derivatives trading regulations in the US</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Should be doable for multinational asset managers</p></li>
+<li><p>Explore options to establish offshore domicile from which to transact legally</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Risk of not being able to keep positions perfectly hedged in the event of extreme volatility - liquidation price and automatic deleveraging</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Conservative leverage - quantify % change until unhedged</p></li>
+<li><p>Rebalance evaluated a very frequent intervals</p></li>
+<li><p>How many price changes of liquidation price magnitude in last three years</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Risk of exchanges collapsing / being hacked</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Mitigate by trading across multiple exchanges</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Macro / regulatory risk of crypto going away that decimates values to the point that the exchanges collapse so quickly that positions can’t be liquidated</p></li>
+<li><p>Counterparty risk on the futures contracts</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Insurance fund</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Trading volumes aren’t as big as they are reported to be</p></li>
+</ol>
+<p><span id="id2">[<a class="reference internal" href="references.html#id2" title="Robert J Shiller. Measuring Asset Values for Cash Settlement in Derivative Markets: Hedonic Repeated Measures Indices and Perpetual Futures. Journal of Finance, 48(3):911-931, July 1993. URL: https://ideas.repec.org/a/bla/jfinan/v48y1993i3p911-31.html, doi:.">Shiller, 1993</a>]</span></p>
+<div class="math notranslate nohighlight" id="equation-index-0">
+<span class="eqno">(1)<a class="headerlink" href="#equation-index-0" title="Permalink to this equation">¶</a></span>\[\frac{1}{2}\]</div>
+</div>
+<div class="section" id="further-enhancements">
+<h1>Further Enhancements<a class="headerlink" href="#further-enhancements" title="Permalink to this headline">¶</a></h1>
+<ol class="arabic simple">
+<li><p>As the academic literature indicates, changes in the price of the perpetual futures contract are not perfectly correlated with changes in the spot price. As such, there me be opportunity to increase returns at the margin by effecting a mean-variance optimized hedging strategy that results in a short position that is not the same size as the futures contract.</p></li>
+</ol>
+</div>
+
+
+              </div>
+              
+              
+              <div class='prev-next-bottom'>
+                
+    <a class='right-next' id="next-link" href="assets.html" title="next page">Assets</a>
+
+              </div>
+              
+          </main>
+          
+
+      </div>
+    </div>
+  
+  <script src="_static/js/index.1c5a1a01449ed65a7b51.js"></script>
+
+  <footer class="footer mt-5 mt-md-0">
+  <div class="container">
+    
+    <div class="footer-item">
+      <p class="copyright">
+    &copy; Copyright 2021, Caleb Everett.<br/>
+</p>
+    </div>
+    
+    <div class="footer-item">
+      <p class="sphinx-version">
+Created using <a href="http://sphinx-doc.org/">Sphinx</a> 4.0.2.<br/>
+</p>
+    </div>
+    
+  </div>
+</footer>
+  </body>
+</html>
