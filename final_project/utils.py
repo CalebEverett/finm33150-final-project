@@ -25,6 +25,19 @@ from scipy import stats
 from tabulate import tabulate
 from tqdm.notebook import tqdm
 
+SYMBOLS = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "DOGEUSDT",
+    "XRPUSDT",
+    "BNBUSDT",
+    "ADAUSDT",
+    "DOTUSDT",
+    "MATICUSDT",
+    "EOSUSDT",
+    "LINKUSDT",
+]
+
 # =============================================================================
 # Credentials
 # =============================================================================
@@ -1221,7 +1234,22 @@ class Strategy:
 
         fig.add_trace(
             go.Scatter(
-                y=df_stats["position_profit"] + df_stats["transact_cost"],
+                y=df_stats["liquidation_cost"] + df_stats["transact_cost"],
+                x=df_stats["date"],
+                name="liquidation_cost",
+                line=dict(width=1),
+                fill="tonexty",
+            ),
+            secondary_y=False,
+            row=3,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                y=df_stats["position_profit"]
+                + df_stats["transact_cost"]
+                + df_stats["liquidation_cost"],
                 x=df_stats["date"],
                 name="net_position_profit",
                 line=dict(width=1),
@@ -1237,6 +1265,7 @@ class Strategy:
             go.Scatter(
                 y=df_stats["position_profit"]
                 + df_stats["funding_rate_profit"]
+                + df_stats["liquidation_cost"]
                 + df_stats["transact_cost"],
                 x=df_stats["date"],
                 name="fund_plus_pos_profit",
@@ -1254,11 +1283,18 @@ class Strategy:
         # =======================
 
         title_text = (
-            f"{title_text}: {label_fn(self.pair)}: {start_date.strftime(date_fmt)}"
+            f"{title_text}: {self.df_ticks.name}: {label_fn(self.pair)}: {start_date.strftime(date_fmt)}"
             f" - {end_date.strftime(date_fmt)}"
         )
 
-        fig.update_yaxes(range=(-0.002, 0.004), row=1, col=1)
+        fig.update_yaxes(
+            range=(
+                self.df_ticks.adj_return.spread.quantile(0.001),
+                self.df_ticks.adj_return.spread.quantile(0.999),
+            ),
+            row=1,
+            col=1,
+        )
 
         fig.update_layout(
             template="none",
@@ -1267,37 +1303,7 @@ class Strategy:
             title_text=title_text,
         )
 
-        # shapes = []
-        # for month_end in self.month_ends:
-        #     shapes.append(
-        #         dict(
-        #             type="line",
-        #             yref="paper",
-        #             y0=0.55,
-        #             y1=0.98,
-        #             xref="x",
-        #             line_dash="dot",
-        #             line_width=1,
-        #             x0=month_end,
-        #             x1=month_end,
-        #         )
-        #     )
-        #     shapes.append(
-        #         dict(
-        #             type="line",
-        #             yref="paper",
-        #             y0=0.05,
-        #             y1=0.42,
-        #             xref="x",
-        #             line_dash="dot",
-        #             line_width=1,
-        #             x0=month_end,
-        #             x1=month_end,
-        #         )
-        #     )
-
         fig.update_layout(
-            # shapes=shapes,
             hoverlabel=dict(font_family="Courier New, monospace"),
             # hovermode="x unified",
         )
@@ -1314,18 +1320,6 @@ class Strategy:
             title="",
         )
         fig.add_annotation(returns_annotation)
-
-        # spread_annotation = get_moments_annotation(
-        #     self.df_ticks.adj_return.funding_rate,
-        #     xref="paper",
-        #     yref="paper",
-        #     x=1,
-        #     y=0.8,
-        #     xanchor="left",
-        #     labels=IS_labels,
-        #     title="",
-        # )
-        # fig.add_annotation(spread_annotation)
 
         return fig
 
@@ -1345,12 +1339,13 @@ def get_ticks(
 
     df_ticks = pd.DataFrame()
     for asset, df in {"perpetual": df_perpetual, "spot": df_spot}.items():
-        df = df[["open", "close", "per_return"]].copy()
+        df = df[["open", "close", "volume", "per_return"]].copy()
         df["position_size"] = dollar_position_size / df["close"]
         df.columns = pd.MultiIndex.from_tuples(
             [
                 ("adj_open", asset),
                 ("adj_close", asset),
+                ("volume", asset),
                 ("adj_return", asset),
                 ("position_size", asset),
             ],
@@ -1374,6 +1369,181 @@ def get_ticks(
     df_ticks = df_ticks.sort_index(axis=1)
 
     return df_ticks.dropna()
+
+
+# =============================================================================
+# Returns
+# =============================================================================
+
+
+def load_ticks(symbol: str) -> pd.DataFrame:
+    """
+    Loads ticks to dataframe from csv.
+    """
+
+    df_ticks = (
+        pd.read_csv(f"data/df_ticks_{symbol}.csv", parse_dates=["date"])
+        .set_index(["date", "series", "asset"])["0"]
+        .unstack(["series", "asset"])
+        .loc[:"2021-05-31"]
+    )
+
+    df_ticks.name = symbol
+
+    return df_ticks
+
+
+def get_returns_stats(symbols: List, strategy_params: Dict) -> pd.DataFrame:
+    """
+    Returns list of stats and numbers of trades for each symbol.
+    """
+
+    stats_dict = {}
+    for symbol in symbols:
+        stats_dict[symbol] = {}
+
+        try:
+            df_ticks = load_ticks(symbol)
+        except FileNotFoundError:
+
+            tick_params = dict(interval="1h", start_time="2020-06-01")
+
+            df_perpetual = get_continuous_contracts(pair=symbol, **tick_params)
+            df_spot = get_klines(symbol=symbol, **tick_params)
+            df_funding = get_funding_rate_history(
+                symbol=symbol, start_time=tick_params["start_time"]
+            )
+
+            df_ticks = get_ticks(
+                df_perpetual,
+                df_spot,
+                df_funding,
+                capital=strategy_params["capital"],
+                leverage=strategy_params["leverage"],
+            )
+
+            df_ticks.stack(["series", "asset"]).to_csv(f"data/df_ticks_{symbol}.csv")
+
+        strategy_params["df_ticks"] = df_ticks
+        strategy_params["closed_positions"] = []
+
+        strategy = Strategy(**strategy_params)
+        stats_dict[symbol]["stats"] = strategy.stats
+        stats_dict[symbol]["n_trades"] = len(strategy.closed_positions) // 2
+
+    return stats_dict
+
+
+def get_returns_sum(stats_dict: Dict, freq: str = "M") -> pd.DataFrame:
+    """
+    Returns dataframe with key return statistics for each symbol and in
+    aggregate for the frequency specified based on sum of log returns.
+    """
+
+    # get dataframe of hourly returns for each symbol
+    tick_returns = []
+    for symbol, data in stats_dict.items():
+        df = pd.DataFrame(data["stats"]).set_index("date")
+        s_tick_return = df[df.total_profit != 0].tick_return
+        s_tick_return.name = symbol
+        tick_returns.append(s_tick_return)
+    df_returns = pd.concat(tick_returns, axis=1)
+
+    # get daily spy return
+    if False:
+        df_spy = utils.fetch_ticker(
+            "SPY", query_params={"start_date": "2020-06-01", "end_date": "2021-05-31"}
+        )
+        df_spy.date = pd.to_datetime(df_spy.date)
+        df_spy = (
+            df_spy.set_index("date")
+            .reindex(pd.date_range("2020-06-01", "2021-05-31"))
+            .ffill()
+        )
+        df_spy.index.name = "date"
+        df_spy.reset_index().to_csv("df_spy.csv", index=False)
+    else:
+        df_spy = pd.read_csv("data/df_spy.csv", parse_dates=["date"]).set_index("date")
+        df_spy["adj_return"] = np.log(df_spy.adj_close / df_spy.adj_close.shift())
+
+    # calc returns sum for each symbol
+    crypto_rets = []
+    symbol_rets = []
+    return_records = []
+    for symbol, data in stats_dict.items():
+
+        df_ticks = (
+            pd.read_csv(f"data/df_ticks_{symbol}.csv", parse_dates=["date"])
+            .set_index(["date", "series", "asset"])["0"]
+            .unstack(["series", "asset"])
+            .loc[:"2021-05-31"]
+        )
+        crypto_ret = df_ticks.adj_return.spot.resample(freq).sum()
+        crypto_ret.name = symbol
+        spy_ret = df_spy.resample(freq).sum().adj_return.loc[crypto_ret.index]
+        symbol_ret = df_returns.resample(freq).sum()[symbol][crypto_ret.index]
+        symbol_ret.name = symbol
+
+        return_rec = {}
+        return_rec["pair"] = symbol
+        return_rec["n_trades"] = data["n_trades"]
+        return_rec["return_total"] = data["stats"][-1]["total_return"]
+        return_rec["return_per_mean"] = symbol_ret.mean()
+        return_rec["return_per_std"] = symbol_ret.std()
+        return_rec["return_per_min"] = symbol_ret.min()
+        return_rec["return_per_min_crypto"] = crypto_ret.min()
+        return_rec["sharpe"] = symbol_ret.mean() / symbol_ret.std()
+        return_rec["sortino"] = (
+            return_rec["return_per_mean"] / symbol_ret[symbol_ret < 0].std()
+        )
+        return_rec["beta_crypto"] = symbol_ret.corr(crypto_ret)
+        return_rec["beta_cypto_downside"] = symbol_ret[crypto_ret < 0].corr(
+            crypto_ret[crypto_ret < 0]
+        )
+        return_rec["beta_spy"] = symbol_ret.corr(spy_ret)
+        return_rec["beta_spy_downside"] = symbol_ret[spy_ret < 0].corr(
+            spy_ret[spy_ret < 0]
+        )
+
+        return_records.append(return_rec)
+        crypto_rets.append(crypto_ret)
+        symbol_rets.append(symbol_ret)
+
+    # calc returns sum for total
+    df_returns_sum = pd.DataFrame(return_records).set_index("pair")
+    df_crypto_rets = pd.concat(crypto_rets, axis=1)
+    df_symbol_rets = pd.concat(symbol_rets, axis=1)
+
+    return_rec_total = {}
+    return_rec_total["pair"] = "TOTAL"
+    return_rec_total["n_trades"] = df_returns_sum.n_trades.sum()
+
+    symbol_ret = df_symbol_rets.mean(axis=1)
+    crypto_ret = df_crypto_rets.mean(axis=1)
+
+    return_rec_total["return_total"] = symbol_ret.sum()
+    return_rec_total["return_per_mean"] = symbol_ret.mean()
+    return_rec_total["return_per_std"] = symbol_ret.std()
+    return_rec_total["return_per_min"] = symbol_ret.min()
+    return_rec_total["return_per_min_crypto"] = crypto_ret.min()
+    return_rec_total["sharpe"] = symbol_ret.mean() / symbol_ret.std()
+    return_rec_total["sortino"] = (
+        return_rec_total["return_per_mean"] / symbol_ret[symbol_ret < 0].std()
+    )
+    return_rec_total["beta_crypto"] = symbol_ret.corr(crypto_ret)
+    return_rec_total["beta_cypto_downside"] = symbol_ret[crypto_ret < 0].corr(
+        crypto_ret[crypto_ret < 0]
+    )
+    return_rec_total["beta_spy"] = symbol_ret.corr(spy_ret)
+    return_rec_total["beta_spy_downside"] = symbol_ret[spy_ret < 0].corr(
+        spy_ret[spy_ret < 0]
+    )
+
+    df_returns_sum = pd.concat(
+        [df_returns_sum, pd.DataFrame([return_rec_total]).set_index("pair")]
+    )
+
+    return df_returns_sum
 
 
 # =============================================================================
@@ -1645,4 +1815,39 @@ def make_2_yaxis_lines(
     )
 
     fig.update_layout(title=title_text)
+    return fig
+
+
+def make_top_ten_volume(title: str, asset: str = "perpetual") -> go.Figure:
+    volume_list = []
+    for symbol in SYMBOLS:
+        df_ticks = load_ticks(symbol)
+        s_volume = df_ticks.volume[asset] * df_ticks.adj_close[asset]
+        s_volume.name = symbol
+        volume_list.append(s_volume)
+    df_volume = pd.concat(volume_list, axis=1)
+    fig = (
+        df_volume.resample("W")
+        .sum()
+        .plot(kind="bar", title=title, labels=dict(variable="pair"))
+    )
+
+    return fig
+
+
+def make_funding_rates_chart() -> go.Figure:
+    df_funding = (
+        pd.read_csv("data/funding_rates.csv", parse_dates=["fundingTime"])
+        .set_index("fundingTime")
+        .resample("D")
+        .mean()
+        .loc["2020-06-01":"2021-05-31"]
+    )
+
+    fig = df_funding.plot(
+        title="Average Funding Rate - Perpetual Futures on Biance",
+        labels=dict(variable="pair"),
+    )
+    fig.update_traces(line=dict(width=1))
+
     return fig

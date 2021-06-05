@@ -84,6 +84,7 @@ submissions
 *.csv
 *.zip
 data
+html/*.html
 
 !tests/df_ticks.csv
-!docsrc/_static/bench.csv
+
