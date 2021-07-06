@@ -223,8 +223,8 @@ def sign_request(tbd):
 
 def get_coin_futures_positions():
 
-    base_url = "https://dapi.binance.com"
-    end_point = "/dapi/v1/positionRisk"
+    base_url = "https://fapi.binance.com"
+    end_point = "/fapi/v1/positionRisk"
 
     params = dict(timestamp=round(datetime.now(timezone.utc).timestamp() * 1000))
     request = Request("GET", f"{base_url}{end_point}", params=params)

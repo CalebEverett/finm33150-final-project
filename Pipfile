@@ -32,6 +32,8 @@ boto3 = "*"
 psutil = "*"
 kaleido = "*"
 jupyter-contrib-nbextensions = "*"
+websocket-client = "*"
+websockets = "*"
 
 [requires]
 python_version = "3.8"
